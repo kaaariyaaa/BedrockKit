@@ -22,7 +22,7 @@ const cwd = process.cwd();
 
 export async function handleInit(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
-  const projectName =
+  let projectName =
     (parsed.flags.name as string | undefined) ?? parsed.positional[0];
   const templateArg = parsed.flags.template as string | undefined;
   const nonInteractive = !!parsed.flags.yes;
@@ -36,13 +36,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     (parsed.flags["script-api-version"] as string | undefined) ||
     DEFAULT_SCRIPT_API_VERSION;
   const force = !!parsed.flags.force;
-  const targetName = projectName ?? "bedrock-addon";
-  const targetDir = resolve(cwd, targetName);
 
   if (!projectName && !nonInteractive) {
     const nameInput = await text({
       message: "Project name",
-      initialValue: "bedrock-addon",
+      initialValue: "addon",
       validate: (value) =>
         value.trim().length === 0 ? "Project name is required" : undefined,
     });
@@ -50,9 +48,21 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       outro("Cancelled.");
       return;
     }
-    parsed.positional[0] = String(nameInput);
+    projectName = String(nameInput).trim();
+    parsed.positional[0] = projectName;
   }
 
+  const dirFlag =
+    (parsed.flags.dir as string | undefined) ??
+    (parsed.flags["target-dir"] as string | undefined);
+  const baseDir = resolve(cwd, "project", "addon");
+  const nameForPath = projectName ?? "addon";
+  const targetDir = dirFlag
+    ? resolve(cwd, dirFlag)
+    : resolve(baseDir, nameForPath);
+  const targetName =
+    projectName ??
+    ((dirFlag ?? targetDir).split(/[/\\]/).filter(Boolean).pop() ?? "project");
   let template = templateArg;
   if (!template && !nonInteractive) {
     const choice = await select({
