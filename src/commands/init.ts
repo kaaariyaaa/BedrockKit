@@ -17,6 +17,7 @@ import { knownTemplates } from "../templates.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
+import { writeFile } from "node:fs/promises";
 
 const cwd = process.cwd();
 
@@ -27,11 +28,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   const templateArg = parsed.flags.template as string | undefined;
   const nonInteractive = !!parsed.flags.yes;
   const includeScript = parsed.flags["no-script"] ? false : true;
-  const scriptEntry = (parsed.flags["script-entry"] as string | undefined) ?? "scripts/main.js";
+  const scriptEntry = (parsed.flags["script-entry"] as string | undefined) ?? "scripts/main.ts";
   const scriptLanguage = (parsed.flags["script-language"] as
     | "javascript"
     | "typescript"
-    | undefined) ?? "javascript";
+    | undefined) ?? "typescript";
   const scriptApiVersion =
     (parsed.flags["script-api-version"] as string | undefined) ||
     DEFAULT_SCRIPT_API_VERSION;
@@ -123,6 +124,9 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     sync: {
       defaultTarget: "dev",
     },
+    paths: {
+      root: targetDir,
+    },
     script: includeScript
       ? {
           entry: scriptEntry,
@@ -138,6 +142,16 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     await writeJson(resolve(targetDir, "packs/resource/manifest.json"), resourceManifest);
     await writeJson(configPath, config);
     await ensureDir(resolve(targetDir, "dist"));
+    if (includeScript) {
+      const scriptPath = resolve(targetDir, "packs/behavior", scriptEntry);
+      const scriptDir = resolve(scriptPath, "..");
+      await ensureDir(scriptDir);
+      const defaultScript =
+        scriptLanguage === "typescript"
+          ? `// Entry point for your behavior pack (TypeScript)\n// Template based on https://github.com/kaaariyaaa/MCBEAddonTemplate\nimport { world, system } from "@minecraft/server";\n\nsystem.run(() => {\n  world.afterEvents.worldInitialize.subscribe(() => {\n    world.sendMessage("[Addon] Initialized");\n  });\n\n  world.beforeEvents.chatSend.subscribe((ev) => {\n    if (ev.message === "!ping") {\n      ev.cancel = true;\n      ev.sender.sendMessage("pong");\n    }\n  });\n});\n`
+          : `// Entry point for your behavior pack (JavaScript)\nimport { world, system } from "@minecraft/server";\n\nsystem.run(() => {\n  world.afterEvents.worldInitialize.subscribe(() => {\n    world.sendMessage("[Addon] Initialized");\n  });\n\n  world.beforeEvents.chatSend.subscribe((ev) => {\n    if (ev.message === "!ping") {\n      ev.cancel = true;\n      ev.sender.sendMessage("pong");\n    }\n  });\n});\n`;
+      await writeFile(scriptPath, defaultScript, { encoding: "utf8" });
+    }
   } catch (err) {
     spin.stop("Failed to write files");
     throw err;
