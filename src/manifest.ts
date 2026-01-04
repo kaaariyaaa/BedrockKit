@@ -43,9 +43,25 @@ export type GenerateManifestOptions = {
   scriptLanguage?: "javascript" | "typescript";
   scriptDependencies?: ManifestScriptDependency[];
   scriptApiVersion?: string;
+  scriptApiVersions?: ScriptApiVersionMap;
+  scriptApiSelection?: ScriptApiVersionSelection;
 };
 
-export const DEFAULT_SCRIPT_API_VERSION = "1.10.0";
+export type ScriptApiVersionMap = {
+  server?: string;
+  serverUi?: string;
+  common?: string;
+  math?: string;
+};
+
+export type ScriptApiVersionSelection = {
+  server?: boolean;
+  serverUi?: boolean;
+  common?: boolean;
+  math?: boolean;
+};
+
+export const DEFAULT_SCRIPT_API_VERSION = "1.11.0";
 
 export function buildScriptDependencies(
   version: string = DEFAULT_SCRIPT_API_VERSION,
@@ -56,6 +72,32 @@ export function buildScriptDependencies(
     { module_name: "@minecraft/common", version },
     { module_name: "@minecraft/math", version },
   ];
+}
+
+export function buildScriptDependenciesFromMap(
+  versions: ScriptApiVersionMap,
+  fallback: string = DEFAULT_SCRIPT_API_VERSION,
+  selection: ScriptApiVersionSelection = {
+    server: true,
+    serverUi: true,
+    common: false,
+    math: false,
+  },
+): ManifestScriptDependency[] {
+  const deps: ManifestScriptDependency[] = [];
+  if (selection.server !== false) {
+    deps.push({ module_name: "@minecraft/server", version: versions.server ?? fallback });
+  }
+  if (selection.serverUi !== false) {
+    deps.push({ module_name: "@minecraft/server-ui", version: versions.serverUi ?? fallback });
+  }
+  if (selection.common !== false) {
+    deps.push({ module_name: "@minecraft/common", version: versions.common ?? fallback });
+  }
+  if (selection.math !== false) {
+    deps.push({ module_name: "@minecraft/math", version: versions.math ?? fallback });
+  }
+  return deps;
 }
 
 export const defaultScriptDependencies = buildScriptDependencies();
@@ -85,7 +127,13 @@ export function generateManifest(opts: GenerateManifestOptions): Manifest {
     });
     const scriptDeps =
       opts.scriptDependencies ??
-      buildScriptDependencies(opts.scriptApiVersion ?? DEFAULT_SCRIPT_API_VERSION);
+      (opts.scriptApiVersions
+        ? buildScriptDependenciesFromMap(
+            opts.scriptApiVersions,
+            opts.scriptApiVersion ?? DEFAULT_SCRIPT_API_VERSION,
+            opts.scriptApiSelection,
+          )
+        : buildScriptDependencies(opts.scriptApiVersion ?? DEFAULT_SCRIPT_API_VERSION));
     dependencies.push(...scriptDeps);
   }
 

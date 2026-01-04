@@ -2,6 +2,7 @@ import { handleInit } from "./init.js";
 import { handleTemplate } from "./template.js";
 import { handleValidate } from "./validate.js";
 import { handleConfig } from "./config.js";
+import { handleBump } from "./bump.js";
 import type { Command } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
@@ -15,22 +16,16 @@ export function buildCommands(onHelp: () => void): Command[] {
       run: handleInit,
     },
     {
+      name: "bump",
+      description: "Bump version and regenerate manifest/version metadata",
+      run: handleBump,
+    },
+    {
       name: "template",
       description: "Manage templates (list/add/rm) for project scaffolding",
       run: handleTemplate,
     },
-    {
-      name: "bump",
-      description: "Bump version and regenerate manifest/version metadata",
-      run: async (ctx) => {
-        const parsed = parseArgs(ctx.argv);
-        const level = parsed.positional[0] ?? "patch";
-        console.log(`[bump] Simulating version bump: ${level}`);
-        console.log(
-          "Would update: manifests (header/modules), config, lockfiles as needed.",
-        );
-      },
-    },
+
     {
       name: "validate",
       description: "Validate manifests, dependencies, and project structure",

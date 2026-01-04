@@ -22,6 +22,8 @@ export function validateConfig(config: BkitConfig): string[] {
   if (!config.build?.outDir) issues.push("config.build.outDir is missing");
   if (!config.sync?.defaultTarget)
     issues.push("config.sync.defaultTarget is missing");
+  if (config.paths && typeof config.paths !== "object")
+    issues.push("config.paths must be an object if present");
 
   if (config.script) {
     if (!config.script.entry) issues.push("config.script.entry is missing");
@@ -29,6 +31,8 @@ export function validateConfig(config: BkitConfig): string[] {
       issues.push("config.script.language is missing");
     if (!config.script.dependencies?.length)
       issues.push("config.script.dependencies is empty");
+    if (config.script.apiVersion && typeof config.script.apiVersion !== "string")
+      issues.push("config.script.apiVersion must be a string if provided");
   }
 
   return issues;

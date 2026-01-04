@@ -20,10 +20,26 @@ export type VersionTuple = [number, number, number];
 export type ScriptLanguage = "javascript" | "typescript";
 
 export type ScriptDependency = { module_name: string; version: string };
+export type ScriptApiVersionMap = {
+  server?: string;
+  serverUi?: string;
+  common?: string;
+  math?: string;
+};
+
+export type ScriptApiSelection = {
+  server?: boolean;
+  serverUi?: boolean;
+  common?: boolean;
+  math?: boolean;
+};
 
 export type BkitConfig = {
   project: { name: string; version: string };
   template: string;
+  paths?: {
+    root?: string;
+  };
   packs: {
     behavior: string;
     resource: string;
