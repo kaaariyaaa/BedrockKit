@@ -1,5 +1,7 @@
 import { handleInit } from "./init.js";
 import { handleTemplate } from "./template.js";
+import { handleValidate } from "./validate.js";
+import { handleConfig } from "./config.js";
 import type { Command } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
@@ -32,14 +34,7 @@ export function buildCommands(onHelp: () => void): Command[] {
     {
       name: "validate",
       description: "Validate manifests, dependencies, and project structure",
-      run: async (ctx) => {
-        const parsed = parseArgs(ctx.argv);
-        const strict = !!parsed.flags.strict;
-        console.log("[validate] Running static checks%s", strict ? " (strict)" : "");
-        console.log("- manifest schema");
-        console.log("- dependency linkage");
-        console.log("- uuid collisions");
-      },
+      run: handleValidate,
     },
     {
       name: "build",
@@ -74,11 +69,7 @@ export function buildCommands(onHelp: () => void): Command[] {
     {
       name: "config",
       description: "Manage and inspect bkit configuration",
-      run: async (ctx) => {
-        const parsed = parseArgs(ctx.argv);
-        const inspect = parsed.flags.show ?? "all";
-        console.log(`[config] Inspecting config scope: ${inspect}`);
-      },
+      run: handleConfig,
     },
     {
       name: "help",

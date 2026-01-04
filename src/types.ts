@@ -16,3 +16,29 @@ export type ParsedArgs = {
 };
 
 export type VersionTuple = [number, number, number];
+
+export type ScriptLanguage = "javascript" | "typescript";
+
+export type ScriptDependency = { module_name: string; version: string };
+
+export type BkitConfig = {
+  project: { name: string; version: string };
+  template: string;
+  packs: {
+    behavior: string;
+    resource: string;
+  };
+  build: {
+    outDir: string;
+    target: string;
+  };
+  sync: {
+    defaultTarget: string;
+  };
+  script?: {
+    entry: string;
+    language: ScriptLanguage;
+    dependencies: ScriptDependency[];
+    apiVersion?: string;
+  };
+};
