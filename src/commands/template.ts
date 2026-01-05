@@ -7,15 +7,17 @@ import {
 } from "../templates.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
+import { resolveLang, t } from "../utils/i18n.js";
 
 export async function handleTemplate(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   let [sub] = parsed.positional;
   const registry = await loadTemplateRegistry();
 
   if (!sub) {
     const choice = await select({
-      message: "Template command",
+      message: t("template.commandPrompt", lang),
       options: [
         { value: "list", label: "List" },
         { value: "add", label: "Add(Git URL)" },
@@ -25,7 +27,7 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
       initialValue: "list",
     });
     if (isCancel(choice)) {
-      console.log("Aborted.");
+      console.log(t("template.aborted", lang));
       return;
     }
     sub = String(choice);
@@ -47,22 +49,22 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
     let url = parsed.positional[2] ?? (parsed.flags.url as string | undefined);
     if (!name) {
       const input = await text({
-        message: "Template name",
-        validate: (v) => (!v.trim() ? "Name is required" : undefined),
+        message: t("template.name", lang),
+        validate: (v) => (!v.trim() ? t("template.nameRequired", lang) : undefined),
       });
       if (isCancel(input)) {
-        console.log("Aborted.");
+        console.log(t("template.aborted", lang));
         return;
       }
       name = String(input).trim();
     }
     if (!url) {
       const input = await text({
-        message: "Git URL",
-        validate: (v) => (!v.trim() ? "URL is required" : undefined),
+        message: t("template.url", lang),
+        validate: (v) => (!v.trim() ? t("template.urlRequired", lang) : undefined),
       });
       if (isCancel(input)) {
-        console.log("Aborted.");
+        console.log(t("template.aborted", lang));
         return;
       }
       url = String(input).trim();
@@ -99,11 +101,11 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
       return;
     }
     const ok = await confirm({
-      message: `Remove template '${name}'?`,
+      message: t("template.removeConfirm", lang, { name }),
       initialValue: false,
     });
     if (isCancel(ok) || !ok) {
-      console.log("Aborted.");
+      console.log(t("template.aborted", lang));
       return;
     }
     const next = registry.filter((t) => t.name !== name);
@@ -121,11 +123,11 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
     let name = parsed.positional[1];
     if (!name) {
       const input = await text({
-        message: "Template name to update",
-        validate: (v) => (!v.trim() ? "Name is required" : undefined),
+        message: t("template.nameToUpdate", lang),
+        validate: (v) => (!v.trim() ? t("template.nameRequired", lang) : undefined),
       });
       if (isCancel(input)) {
-        console.log("Aborted.");
+        console.log(t("template.aborted", lang));
         return;
       }
       name = String(input).trim();

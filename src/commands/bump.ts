@@ -12,6 +12,7 @@ import {
   stringToVersionTuple,
 } from "../utils/version.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
+import { resolveLang } from "../utils/i18n.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -35,9 +36,10 @@ function updateManifestVersion(manifest: Manifest, nextVersionTuple: [number, nu
 
 export async function handleBump(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const level = (parsed.positional[0] as BumpLevel | undefined) ?? "patch";
 
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
     console.error("Config selection cancelled.");
     process.exitCode = 1;

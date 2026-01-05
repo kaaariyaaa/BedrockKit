@@ -2,6 +2,8 @@ import { resolve, dirname, basename, relative } from "node:path";
 import { readdir } from "node:fs/promises";
 import { select, isCancel } from "@clack/prompts";
 import { pathExists } from "./fs.js";
+import { resolveLang, t } from "./i18n.js";
+import type { Lang } from "../types.js";
 
 async function discoverAddonConfigs(cwd: string): Promise<string[]> {
   const base = resolve(cwd, "project");
@@ -16,8 +18,9 @@ async function discoverAddonConfigs(cwd: string): Promise<string[]> {
   return configs;
 }
 
-export async function resolveConfigPath(flagPath?: string): Promise<string | null> {
+export async function resolveConfigPath(flagPath?: string, langInput?: string | boolean): Promise<string | null> {
   const cwd = process.cwd();
+  const lang: Lang = resolveLang(langInput);
   if (flagPath) return resolve(cwd, flagPath);
 
   const discovered = await discoverAddonConfigs(cwd);
@@ -35,7 +38,7 @@ export async function resolveConfigPath(flagPath?: string): Promise<string | nul
     };
   });
   const choice = await select({
-    message: "Select project",
+    message: t("config.selectProject", lang),
     options,
   });
   if (isCancel(choice)) return null;

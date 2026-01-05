@@ -2,10 +2,12 @@
 
 Minecraft Bedrock Edition 向けのアドオン／リソースパック開発を一括で回すための CLI です。初期化・依存管理・ビルド・配布パッケージ作成・開発環境への同期までを `bkit` コマンドで扱えます。
 
+[English version is here](./README.en.md)
+
 ## 動作要件
-- Node.js 20 以上
-- npm / git（テンプレート取得や依存インストールに使用）
-- Windows / macOS / Linux いずれでも利用可能。Sync でゲームの開発用フォルダへコピーする際は、対象環境に合わせた権限が必要です。
+- **Node.js**: 20 以上
+- **npm / git**: テンプレート取得や依存インストールに使用
+- **OS**: Windows / macOS / Linux いずれでも利用可能。Sync でゲームの開発用フォルダへコピーする際は、対象環境に合わせた権限が必要です。
 
 ## インストール
 リポジトリを取得後、依存を入れてグローバルにリンクします。
@@ -73,34 +75,37 @@ project/<addon-name>/
 ```
 
 ## 主なコマンド
-- `bkit init` (`new`) – テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。ESLint ルール（例: `minecraft-linting/avoid-unnecessary-command`）は有効/無効を対話選択でき、フラグ `--eslint-rules <csv>` / `--no-eslint` でも指定可能。
-- `bkit import <mcpack|mcaddon|zip>` – 既存アーカイブを展開し、`bkit.config.json` を生成してワークスペース化。JS→TS 変換はオプション（`--convert-ts` / `--no-convert-ts`、未指定時は対話確認）。自動変換は互換性リスクがあるため、必要な場合のみ利用推奨。
-- `bkit build [--out-dir <dir>]` – ビヘイビア/リソースパックを `dist/` にコピー。スクリプトエントリが TypeScript の場合は `@minecraft/core-build-tasks` でバンドル。
-- `bkit package [--out <name>]` – `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。必要に応じて事前に build を実行。
-- `bkit sync [--target <name>] [--build=false]` – ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` を指定すると core-build-tasks の `copyTask` で MC 開発環境へデプロイ。
-- `bkit deps` – 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `packs/behavior/manifest.json` を同期。
+- `bkit init` (`new`) – テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。ESLint ルールは有効/無効を対話選択でき、フラグ `--eslint-rules <csv>` / `--no-eslint` でも指定可能。
+- `bkit import <mcpack|mcaddon|zip>` – 既存アーカイブを展開し、`bkit.config.json` を生成してワークスペース化。JS→TS 変換はオプション（`--convert-ts`）。自動変換は互換性リスクがあるため、必要な場合のみ利用を推奨します。
+- `bkit build [--out-dir <dir>]` – ビヘイビア/リソースパックを `dist/` にコピー。スクリプトが TypeScript の場合は `@minecraft/core-build-tasks` でバンドルを実行。
+- `bkit package [--out <name>]` – `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。
+- `bkit sync [--target <name>] [--build=false]` – ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` 指定で Minecraft 開発環境へデプロイ。
+- `bkit deps` – 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `manifest.json` を同期。
 - `bkit bump [major|minor|patch]` – プロジェクト/マニフェストのバージョンを一括更新。
-- `bkit validate [--strict] [--json]` – config と manifest の整合性チェック。
-- `bkit template <list|add|pull|rm>` – テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意リポジトリを登録可能。
-- `bkit watch` – `./project/<name>` 配下を監視し、変更ごとに `build --out-dir .watch-dist` → `sync --build=false --build-dir .watch-dist` を実行。
+- `bkit validate [--strict] [--json]` – config 和 manifest 的整合性チェック。
+- `bkit template <list|add|pull|rm>` – テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意のリポジトリを登録可能。
+- `bkit watch` – `./project/<name>` 配下を監視し、変更ごとにビルドと同期を自動実行。
 - `bkit config [--path <file>] [--json]` – 読み込んだ設定を確認。
+- `bkit setting [--lang <ja|en>]` – CLI 設定を変更（現在は表示言語の切り替えに対応）。フラグ未指定時は対話で選択。
 
 ## 同期ターゲットの書き方
 - **core-build-tasks 経由**（開発版 Minecraft へデプロイ）  
   `sync.targets.<name>.product` に `BedrockUWP | PreviewUWP | BedrockGDK | PreviewGDK` を指定し、`projectName` で開発フォルダ名を上書き可能。
 - **パス指定コピー**  
-  `sync.targets.<name>.behavior` / `resource` にそれぞれのコピー先パスを記載。`bkit sync --dry-run` でコピー内容だけ確認できます。
+  `sync.targets.<name>.behavior` / `resource` にそれぞれのコピー先パスを直接記載。`bkit sync --dry-run` で内容を確認できます。
 
 ## テンプレート運用
-- 既定で `official-sample` が登録されています。`bkit template list` で確認できます。
+- 既定で `official-sample` が登録されています。`bkit template list` で確認可能です。
 - 任意の Git リポジトリを `bkit template add <name> <git-url>` で登録し、`bkit init --template <name>` で利用できます。
 - `.bkit/templates/<name>` にクローンされるため、社内リポジトリ等も扱えます（SSH キーは `BKIT_SSH_KEY` 環境変数で指定可能）。
 
 ## 便利なオプション
-- どのコマンドでも `--config <path>` で対象プロジェクトを指定（複数プロジェクトがある場合は対話選択にも対応）。
-- 機械可読出力が欲しい場合は `--json`、静かに動かす場合は `-q | --quiet`。
-- `build`/`sync`/`package` 共通で `--build=false` を渡すと事前ビルドをスキップ。
-- `.bkitignore` に記載したパターンはビルド／同期時に無視されます。
+- **--config <path>**: 対象プロジェクトを指定。複数ある場合は対話選択も可能。
+- **--json**: 機械可読な形式で出力。
+- **-q | --quiet**: ログ出力を抑制。
+- **--lang <ja|en>**: 表示言語を切り替え。デフォルトは日本語です。環境変数 `BKIT_LANG` もサポートしています。
+- **--build=false**: 共通オプション。事前ビルドをスキップします。
+- **.bkitignore**: ビルド／同期時に無視するパターンを記載。
 
 ## よくある流れ
 1. `bkit init` で土台を作成（または `bkit import` で既存アドオンを取り込み）。

@@ -8,6 +8,7 @@ import { pathExists } from "../utils/fs.js";
 import { handleBuild } from "./build.js";
 import { handleSync } from "./sync.js";
 import { readdir } from "node:fs/promises";
+import { resolveLang, t } from "../utils/i18n.js";
 
 type ProjectEntry = { name: string; configPath: string };
 
@@ -28,6 +29,7 @@ async function discoverProjects(cwd: string): Promise<ProjectEntry[]> {
 
 export async function handleWatch(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const outDirOverride =
     (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
     (typeof parsed.flags.outdir === "string" && parsed.flags.outdir) ||
@@ -50,12 +52,12 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
 
   if (!selected.length) {
     const choice = await multiselect({
-      message: "Select projects to watch",
+      message: t("watch.selectProjects", lang),
       options: projects.map((p) => ({ value: p.name, label: p.name })),
       initialValues: projects.map((p) => p.name),
     });
     if (isCancel(choice)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     selected = choice as string[];
@@ -67,7 +69,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  intro("Watching projects for changes (auto build + sync)");
+  intro(t("watch.intro", lang));
   log(`Using watch build outDir: ${outDirOverride}`);
 
   for (const proj of selectedProjects) {

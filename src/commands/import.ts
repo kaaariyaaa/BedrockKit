@@ -9,6 +9,7 @@ import { ensureDir, pathExists, writeJson } from "../utils/fs.js";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
 import { convertJsTreeToTs } from "../utils/js-to-ts.js";
+import { resolveLang, t } from "../utils/i18n.js";
 
 type PackKind = "behavior" | "resource";
 
@@ -88,6 +89,7 @@ function extractScriptInfo(manifest: ManifestLite): {
 
 export async function handleImport(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   let archivePath = parsed.positional[0] as string | undefined;
   let projectName = parsed.flags.name as string | undefined;
   const unquote = (v: string) => v.replace(/^['"](.+)['"]$/, "$1").trim();
@@ -101,11 +103,11 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
 
   if (!archivePath) {
     const input = await text({
-      message: "Path to .mcpack/.mcaddon/.zip",
-      validate: (v) => (!v.trim() ? "Path is required" : undefined),
+      message: t("import.pathPrompt", lang),
+      validate: (v) => (!v.trim() ? t("import.pathRequired", lang) : undefined),
     });
     if (isCancel(input)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     archivePath = unquote(String(input));
@@ -120,12 +122,12 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
   if (!projectName) {
     const base = basename(archivePath, extname(archivePath));
     const input = await text({
-      message: "Project name",
+      message: t("import.projectName", lang),
       initialValue: base,
-      validate: (v) => (!v.trim() ? "Project name is required" : undefined),
+      validate: (v) => (!v.trim() ? t("import.projectNameRequired", lang) : undefined),
     });
     if (isCancel(input)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     projectName = unquote(String(input));
@@ -135,17 +137,17 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
   if (await pathExists(targetDir)) {
     if (!force) {
       const overwrite = await confirm({
-        message: `Target ${targetDir} exists. Overwrite?`,
+        message: t("import.overwrite", lang),
         initialValue: false,
       });
       if (isCancel(overwrite) || !overwrite) {
-        outro("Cancelled.");
+        outro(t("common.cancelled", lang));
         return;
       }
     }
   }
 
-  intro("Importing project");
+  intro(t("import.intro", lang));
 
   // 代替ログ関数
   const logStep = (msg: string) => console.log(`◇ ${msg}`);
@@ -206,11 +208,11 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     if (behaviorPath && scriptInfo?.entry?.endsWith(".js")) {
       if (convertTs === undefined) {
         const choice = await confirm({
-          message: "Convert scripts to TypeScript (.js -> .ts)? (optional; may require manual fixes)",
+          message: t("import.convertQuestion", lang),
           initialValue: false,
         });
         if (isCancel(choice)) {
-          outro("Cancelled.");
+          outro(t("common.cancelled", lang));
           return;
         }
         convertTs = !!choice;

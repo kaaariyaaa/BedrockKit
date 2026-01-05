@@ -8,9 +8,11 @@ import { ensureDir, pathExists } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
 import { handleBuild } from "./build.js";
 import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
+import { resolveLang, t } from "../utils/i18n.js";
 
 export async function handleSync(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const dryRun = !!parsed.flags["dry-run"];
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
@@ -22,19 +24,19 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   let shouldBuild = parsed.flags.build !== false; // default true
   if (parsed.flags.build === undefined && !dryRun && !jsonOut && !quiet) {
     const buildChoice = await confirm({
-      message: "Run build before sync?",
+      message: t("sync.runBuild", lang),
       initialValue: true,
     });
     if (isCancel(buildChoice)) {
-      console.error("Sync cancelled.");
+      console.error(t("sync.cancelled", lang));
       process.exitCode = 1;
       return;
     }
     shouldBuild = !!buildChoice;
   }
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
-    console.error("Config selection cancelled.");
+    console.error(t("common.cancelled", lang));
     process.exitCode = 1;
     return;
   }
@@ -88,11 +90,11 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   }
   if (!targetName || !(targetName in targets)) {
     const choice = await select({
-      message: "Select sync target",
+      message: t("sync.selectTarget", lang),
       options: targetNames.map((t) => ({ value: t, label: t })),
     });
     if (isCancel(choice)) {
-      console.error("Sync cancelled.");
+      console.error(t("sync.cancelled", lang));
       process.exitCode = 1;
       return;
     }

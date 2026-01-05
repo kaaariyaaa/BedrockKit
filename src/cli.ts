@@ -8,7 +8,9 @@ import pc from "picocolors";
 import { buildCommands } from "./commands/index.js";
 import { printBanner, printCommandHeader } from "./utils/ui.js";
 import { printHelp } from "./help.js";
-import type { Command } from "./types.js";
+import type { Command, Lang } from "./types.js";
+import { resolveLang, t } from "./utils/i18n.js";
+import { loadSettings } from "./utils/settings.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,21 +20,46 @@ const pkg = JSON.parse(
   readFileSync(resolve(root, "package.json"), { encoding: "utf8" }),
 ) as { version?: string };
 
-const commands: Command[] = buildCommands(() => printHelp(commands));
-
-function findCommand(name?: string): Command | undefined {
+function findCommand(name: string | undefined, commands: Command[]): Command | undefined {
   if (!name) return undefined;
   return commands.find(
     (cmd) => cmd.name === name || cmd.aliases?.includes(name),
   );
 }
 
-async function runInteractive(): Promise<void> {
+function extractLang(argv: string[]): string | undefined {
+  const eq = argv.find((a) => a.startsWith("--lang="));
+  if (eq) return eq.split("=", 2)[1];
+  const idx = argv.findIndex((a) => a === "--lang" || a === "-l");
+  if (idx >= 0 && argv[idx + 1]) return argv[idx + 1];
+  return undefined;
+}
+
+function stripLang(argv: string[]): { args: string[]; langInput?: string } {
+  const args: string[] = [];
+  let langInput: string | undefined;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]!;
+    if (arg === "--lang" || arg === "-l") {
+      langInput = argv[i + 1];
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--lang=")) {
+      langInput = arg.split("=", 2)[1];
+      continue;
+    }
+    args.push(arg);
+  }
+  return { args, langInput };
+}
+
+async function runInteractive(commands: Command[], lang: Lang): Promise<void> {
   printBanner();
   intro(pc.inverse(" Interactive Mode "));
   
   const choice = await select({
-    message: "What would you like to do?",
+    message: t("cli.menuPrompt", lang),
     options: commands
       .filter((cmd) => cmd.name !== "help")
       .map((cmd) => ({
@@ -43,31 +70,36 @@ async function runInteractive(): Promise<void> {
   });
 
   if (isCancel(choice)) {
-    outro("Cancelled.");
+    outro(t("common.cancelled", lang));
     return;
   }
 
-  const selected = findCommand(String(choice));
+  const selected = findCommand(String(choice), commands);
   if (!selected) {
-    console.error("Selected command not found.");
+    console.error(t("cli.menuNotFound", lang));
     return;
   }
 
-  await Promise.resolve(selected.run({ argv: [], root }));
-  outro("Done.");
+  await Promise.resolve(selected.run({ argv: [], root, lang }));
+  outro(t("common.done", lang));
 }
 
 async function main(): Promise<void> {
   const [, , ...argvRaw] = process.argv;
+  const { args: argvNoLang, langInput } = stripLang(argvRaw);
+  const settings = await loadSettings();
+  const lang = resolveLang(langInput ?? extractLang(argvRaw), settings.lang);
   const interactiveFlag =
-    argvRaw.includes("--interactive") || argvRaw.includes("-i");
-  const argv = argvRaw.filter(
+    argvNoLang.includes("--interactive") || argvNoLang.includes("-i");
+  const argv = argvNoLang.filter(
     (arg) => arg !== "--interactive" && arg !== "-i",
   );
   const [first, ...rest] = argv;
 
+  const commands: Command[] = buildCommands(lang, () => printHelp(commands));
+
   if (interactiveFlag || !first) {
-    await runInteractive();
+    await runInteractive(commands, lang);
     return;
   }
 
@@ -81,7 +113,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const cmd = findCommand(first);
+  const cmd = findCommand(first, commands);
   if (!cmd) {
     console.error(`Unknown command: ${first}`);
     printHelp(commands);
@@ -90,7 +122,7 @@ async function main(): Promise<void> {
   }
 
   printCommandHeader(cmd.name, cmd.description);
-  await Promise.resolve(cmd.run({ argv: rest, root }));
+  await Promise.resolve(cmd.run({ argv: rest, root, lang }));
 }
 
 main().catch((err) => {

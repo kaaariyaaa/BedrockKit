@@ -9,6 +9,7 @@ import { resolveConfigPath } from "../utils/config-discovery.js";
 import type { Manifest } from "../manifest.js";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
 import { runInstallCommand } from "../utils/npm-install.js";
+import { resolveLang, t } from "../utils/i18n.js";
 
 const SCRIPT_API_PACKAGES = new Set([
   "@minecraft/server",
@@ -39,9 +40,10 @@ async function readManifest(path: string): Promise<Manifest> {
 
 export async function handleDeps(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
-    console.error("Config selection cancelled.");
+    console.error(t("common.cancelled", lang));
     process.exitCode = 1;
     return;
   }
@@ -82,7 +84,7 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   }
 
   const selectPackages = await multiselect({
-    message: "Select Script API packages to include (space to toggle)",
+    message: t("deps.selectPackages", lang),
     options: [
       { value: "@minecraft/server", label: "@minecraft/server", hint: "Core Script API" },
       { value: "@minecraft/server-ui", label: "@minecraft/server-ui", hint: "UI helpers" },
@@ -99,7 +101,7 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
       : ["@minecraft/server", "@minecraft/server-ui"],
   });
   if (isCancel(selectPackages)) {
-    outro("Cancelled.");
+    outro(t("common.cancelled", lang));
     return;
   }
 
@@ -122,14 +124,14 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
     }
 
     const channelChoice = await select({
-      message: `${pkg} channel`,
+      message: t("init.selectChannel", lang, { pkg }),
       options: [
         { value: "stable", label: "stable" },
         { value: "beta", label: "beta" },
         { value: "alpha", label: "alpha" },
         { value: "preview", label: "preview" },
         { value: "other", label: "other" },
-        { value: "__manual__", label: "Enter manually" },
+        { value: "__manual__", label: t("common.enterManually", lang) },
       ],
       initialValue: "stable",
     });
@@ -137,9 +139,9 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
 
     if (channelChoice === "__manual__") {
       const manual = await text({
-        message: `${pkg} version (manual)`,
+        message: t("init.selectVersion", lang, { pkg, channel: "manual" }),
         initialValue: current,
-        validate: (v) => (!v.trim() ? "Version is required" : undefined),
+        validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
       });
       return isCancel(manual) ? null : manual.trim();
     }
@@ -147,19 +149,19 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
     const bucket = channelChoice === "stable" ? cached.get(pkg) : cached.get(`${pkg}:${channelChoice}`);
     const versions = bucket?.versions ?? [];
     const choice = await select({
-      message: `${pkg} version (${channelChoice})`,
+      message: t("init.selectVersion", lang, { pkg, channel: String(channelChoice) }),
       options: [
         ...versions.map((v) => ({ value: v, label: v })),
-        { value: "__manual__", label: "Enter manually" },
+        { value: "__manual__", label: t("common.enterManually", lang) },
       ],
       initialValue: versions[0] ?? current,
     });
     if (isCancel(choice)) return null;
     if (choice === "__manual__") {
       const manual = await text({
-        message: `${pkg} version (manual)`,
+        message: t("init.selectVersion", lang, { pkg, channel: "manual" }),
         initialValue: current,
-        validate: (v) => (!v.trim() ? "Version is required" : undefined),
+        validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
       });
       return isCancel(manual) ? null : manual.trim();
     }
@@ -170,7 +172,7 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   for (const pkg of selectedSet) {
     const picked = await pickVersion(pkg, existing.get(pkg) ?? "");
     if (picked === null) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     scriptDeps.push({ module_name: pkg, version: picked });
@@ -219,5 +221,5 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   await writeJson(configPath, config);
   await writeJson(behaviorManifestPath, behaviorManifest);
 
-  console.log("Updated package.json, config, and manifest with selected Script API packages.");
+  console.log(t("deps.updated", lang));
 }

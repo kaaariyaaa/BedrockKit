@@ -9,72 +9,78 @@ import { handleDeps } from "./deps.js";
 import { handleSync } from "./sync.js";
 import { handleImport } from "./import.js";
 import { handleWatch } from "./watch.js";
-import type { Command } from "../types.js";
+import type { Command, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
+import { t } from "../utils/i18n.js";
+import { handleSetting } from "./setting.js";
 
-export function buildCommands(onHelp: () => void): Command[] {
+export function buildCommands(lang: Lang, onHelp: () => void): Command[] {
   return [
     {
       name: "init",
       aliases: ["new"],
-      description:
-        "Initialize a new Bedrock addon/resource pack workspace from a template",
+      description: t("command.init.desc", lang),
       run: handleInit,
     },
     {
       name: "bump",
-      description: "Bump version and regenerate manifest/version metadata",
+      description: t("command.bump.desc", lang),
       run: handleBump,
     },
     {
       name: "template",
-      description: "Manage templates (list/add/rm) for project scaffolding",
+      description: t("command.template.desc", lang),
       run: handleTemplate,
     },
     {
       name: "import",
-      description: "Import existing mcpack/mcaddon/zip into a project workspace",
+      description: t("command.import.desc", lang),
       run: handleImport,
     },
 
     {
       name: "validate",
-      description: "Validate manifests, dependencies, and project structure",
+      description: t("command.validate.desc", lang),
       run: handleValidate,
     },
     {
       name: "build",
-      description: "Build/compile packs using @minecraft/core-build-tasks",
+      description: t("command.build.desc", lang),
       run: handleBuild,
     },
     {
       name: "package",
-      description: "Package build artifacts into distributable archives (zip)",
+      description: t("command.package.desc", lang),
       run: handlePackage,
     },
     {
       name: "deps",
-      description: "Sync Script API npm dependencies into config/manifest",
+      description: t("command.deps.desc", lang),
       run: handleDeps,
     },
     {
       name: "sync",
-      description: "Sync build outputs to local Minecraft developer folders",
+      description: t("command.sync.desc", lang),
       run: handleSync,
     },
     {
       name: "watch",
-      description: "Watch projects, auto build (watch outDir) and sync on change",
+      description: t("command.watch.desc", lang),
       run: handleWatch,
     },
     {
       name: "config",
-      description: "Manage and inspect bkit configuration",
+      description: t("command.config.desc", lang),
       run: handleConfig,
     },
     {
+      name: "setting",
+      description: t("command.setting.desc", lang),
+      run: handleSetting,
+    },
+    {
       name: "help",
-      description: "Show help",
+      description: t("command.help.desc", lang),
       run: onHelp,
     },
   ];

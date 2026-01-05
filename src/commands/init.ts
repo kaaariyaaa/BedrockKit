@@ -25,11 +25,13 @@ import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
 import { writeFile, cp } from "node:fs/promises";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
 import { runInstallCommand } from "../utils/npm-install.js";
+import { resolveLang, t } from "../utils/i18n.js";
 
 const cwd = process.cwd();
 
 export async function handleInit(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   let projectName =
     (parsed.flags.name as string | undefined) ?? parsed.positional[0];
   const templateArg = parsed.flags.template as string | undefined;
@@ -68,13 +70,13 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
 
   if (!projectName && !nonInteractive) {
     const nameInput = await text({
-      message: "Project name",
+      message: t("init.projectName", lang),
       initialValue: "example-addon",
       validate: (value) =>
-        value.trim().length === 0 ? "Project name is required" : undefined,
+        value.trim().length === 0 ? t("init.projectNameRequired", lang) : undefined,
     });
     if (isCancel(nameInput)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     projectName = String(nameInput).trim();
@@ -93,11 +95,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   let template = templateArg;
   if (!template && !nonInteractive) {
     const choice = await select({
-      message: "Choose a template",
+      message: t("init.chooseTemplate", lang),
       options: knownTemplates,
     });
     if (isCancel(choice)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     template = String(choice);
@@ -109,15 +111,15 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   };
   if (!nonInteractive) {
     const selectedPacks = await multiselect({
-      message: "Select packs to generate",
+      message: t("init.selectPacks", lang),
       options: [
-        { value: "behavior", label: "Behavior Pack" },
-        { value: "resource", label: "Resource Pack" },
+        { value: "behavior", label: t("init.pack.behavior", lang) },
+        { value: "resource", label: t("init.pack.resource", lang) },
       ],
       initialValues: ["behavior", "resource"],
     });
     if (isCancel(selectedPacks)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     const set = new Set(selectedPacks as string[]);
@@ -126,7 +128,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       resource: set.has("resource"),
     };
     if (!packSelection.behavior && !packSelection.resource) {
-      log.error("At least one pack must be selected.");
+      log.error(t("init.packsRequired", lang));
       process.exitCode = 1;
       return;
     }
@@ -134,11 +136,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
 
   if (!nonInteractive && parsed.flags["no-script"] === undefined) {
     const scriptChoice = await confirm({
-      message: "Include script module?",
+      message: t("init.includeScript", lang),
       initialValue: includeScript,
     });
     if (isCancel(scriptChoice)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     includeScript = !!scriptChoice;
@@ -146,12 +148,12 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
 
   if (includeScript && !nonInteractive && !disableEslint && !eslintRulesFlag) {
     const ruleChoice = await multiselect({
-      message: "Enable ESLint rules (space to toggle)",
+      message: t("init.enableEslintRules", lang),
       options: availableEslintRules.map((r) => ({ value: r, label: r })),
       initialValues: availableEslintRules,
     });
     if (isCancel(ruleChoice)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     eslintRules = ruleChoice as string[];
@@ -159,7 +161,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
 
   if (includeScript && !nonInteractive && parsed.flags["script-api-version"] === undefined) {
     const pkgChoice = await multiselect({
-      message: "Select Script API packages to include (space to toggle)",
+      message: t("init.selectPackages", lang),
       options: [
         { value: "server", label: "@minecraft/server", hint: "Core Script API" },
         { value: "serverUi", label: "@minecraft/server-ui", hint: "UI helpers" },
@@ -174,7 +176,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       initialValues: ["server", "serverUi"],
     });
     if (isCancel(pkgChoice)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     const selected = new Set(pkgChoice as string[]);
@@ -219,14 +221,14 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       }
 
       const channelChoice = await select({
-        message: `${pkg} channel`,
+        message: t("init.selectChannel", lang, { pkg }),
         options: [
           { value: "stable", label: "stable" },
           { value: "beta", label: "beta" },
           { value: "alpha", label: "alpha" },
           { value: "preview", label: "preview" },
           { value: "other", label: "other" },
-          { value: "__manual__", label: "Enter manually" },
+          { value: "__manual__", label: t("common.enterManually", lang) },
         ],
         initialValue: "stable",
       });
@@ -234,9 +236,9 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
 
       if (channelChoice === "__manual__") {
         const manual = await text({
-          message: `${pkg} version (manual)`,
+          message: t("init.selectVersion", lang, { pkg, channel: "manual" }),
           initialValue: current,
-          validate: (v) => (!v.trim() ? "Version is required" : undefined),
+          validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
         });
         return isCancel(manual) ? null : manual.trim();
       }
@@ -248,27 +250,27 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       const versions = bucket?.versions ?? [];
       if (!versions.length) {
         const manual = await text({
-          message: `${pkg} version (manual, no versions for channel ${channelChoice})`,
+          message: t("init.selectVersion", lang, { pkg, channel: String(channelChoice) }),
           initialValue: current,
-          validate: (v) => (!v.trim() ? "Version is required" : undefined),
+          validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
         });
         return isCancel(manual) ? null : manual.trim();
       }
 
       const choice = await select({
-        message: `${pkg} version (${channelChoice})`,
+        message: t("init.selectVersion", lang, { pkg, channel: String(channelChoice) }),
         options: [
           ...versions.map((v) => ({ value: v, label: v })),
-          { value: "__manual__", label: "Enter manually" },
+          { value: "__manual__", label: t("common.enterManually", lang) },
         ],
         initialValue: versions[0] ?? current,
       });
       if (isCancel(choice)) return null;
       if (choice === "__manual__") {
         const manual = await text({
-          message: `${pkg} version (manual)`,
+          message: t("init.selectVersion", lang, { pkg, channel: "manual" }),
           initialValue: current,
-          validate: (v) => (!v.trim() ? "Version is required" : undefined),
+          validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
         });
         return isCancel(manual) ? null : manual.trim();
       }
@@ -294,7 +296,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     for (const [key, pkg] of selectedPackages) {
       const picked = await pickVersion(pkg, scriptApiVersion);
       if (picked === null) {
-        outro("Cancelled.");
+        outro(t("common.cancelled", lang));
         return;
       }
       scriptApiVersions[key] = picked;
@@ -306,7 +308,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
 
   if (includeScript && !nonInteractive && parsed.flags["skip-install"] === undefined) {
     const installChoice = await select({
-      message: "Install dependencies?",
+      message: t("init.installDeps", lang),
       options: [
         { value: "npm-install", label: "npm install" },
         { value: "npm-ci", label: "npm ci" },
@@ -317,7 +319,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       initialValue: "npm-install",
     });
     if (isCancel(installChoice)) {
-      outro("Cancelled.");
+      outro(t("common.cancelled", lang));
       return;
     }
     if (installChoice === "skip") {
@@ -343,7 +345,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   intro(pc.inverse(" BedrockKit Init "));
   
   const spin = spinner();
-  spin.start("Generating manifests and config");
+  spin.start(t("init.generating", lang));
 
   const manifestScriptEntry =
     scriptEntry?.endsWith(".ts") && includeScript ? scriptEntry.replace(/\.ts$/, ".js") : scriptEntry;
@@ -422,10 +424,10 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     if (template === "custom-git" && !templateArg && !nonInteractive) {
       const gitUrl = await text({
         message: "Enter Git URL for template",
-        validate: (v) => (!v.trim() ? "URL is required" : undefined),
+        validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
       });
       if (isCancel(gitUrl)) {
-        outro("Cancelled.");
+        outro(t("common.cancelled", lang));
         return;
       }
       templatePath = await materializeTemplate(String(gitUrl).trim(), registry, { allowUrl: true });
@@ -508,17 +510,17 @@ ${eslintRules
     throw err;
   }
 
-  spin.stop("Workspace files created");
+  spin.stop(t("init.summary", lang));
 
   if (includeScript && !skipInstall) {
     const installSpin = spinner();
-    installSpin.start(`Installing dependencies (${installCommandLabel})`);
+    installSpin.start(`${t("init.installingDeps", lang)} (${installCommandLabel})`);
     try {
       await runInstall(targetDir, installCommandLabel);
       installSpin.stop("Dependencies installed");
       installStatus = "completed";
     } catch (err) {
-      installSpin.stop("Failed to install dependencies (continuing without install)");
+      installSpin.stop(t("init.installFailed", lang));
       log.error(err instanceof Error ? err.message : String(err));
       installStatus = "failed";
     }

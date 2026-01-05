@@ -1,6 +1,9 @@
+export type Lang = "ja" | "en";
+
 export type CommandContext = {
   argv: string[];
   root: string;
+  lang?: Lang;
 };
 
 export type Command = {

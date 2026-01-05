@@ -7,9 +7,11 @@ import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
 import { handleBuild } from "./build.js";
+import { resolveLang, t } from "../utils/i18n.js";
 
 export async function handlePackage(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
   const log = jsonOut || quiet ? (_msg?: unknown) => {} : console.log;
@@ -17,18 +19,18 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   if (parsed.flags.build === undefined) {
     if (!jsonOut) {
       const buildChoice = await confirm({
-        message: "Run build before packaging?",
+        message: t("package.runBuild", lang),
         initialValue: true,
       });
       if (isCancel(buildChoice)) {
-        console.error("Packaging cancelled.");
+        console.error(t("package.cancelled", lang));
         process.exitCode = 1;
         return;
       }
       shouldBuild = !!buildChoice;
     }
   }
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
     console.error("Config selection cancelled.");
     process.exitCode = 1;

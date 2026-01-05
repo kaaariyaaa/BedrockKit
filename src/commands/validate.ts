@@ -6,6 +6,7 @@ import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
 import { readFile } from "node:fs/promises";
 import { resolveConfigPath } from "../utils/config-discovery.js";
+import { resolveLang } from "../utils/i18n.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -14,12 +15,13 @@ async function readManifest(path: string): Promise<Manifest> {
 
 export async function handleValidate(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const strict = !!parsed.flags.strict;
   const jsonOut = !!parsed.flags.json;
   const cwd = process.cwd();
   const issues: string[] = [];
 
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
     issues.push("Config selection cancelled.");
     report(issues, { json: jsonOut, configPath: configPath ?? undefined });
