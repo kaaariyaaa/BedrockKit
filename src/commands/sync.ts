@@ -1,16 +1,30 @@
 import { cp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { select, isCancel } from "@clack/prompts";
+import { select, isCancel, confirm } from "@clack/prompts";
 import { loadConfig } from "../config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
+import { handleBuild } from "./build.js";
 import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
 
 export async function handleSync(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const dryRun = !!parsed.flags["dry-run"];
+  let shouldBuild = parsed.flags.build !== false; // default true
+  if (parsed.flags.build === undefined && !dryRun) {
+    const buildChoice = await confirm({
+      message: "Run build before sync?",
+      initialValue: true,
+    });
+    if (isCancel(buildChoice)) {
+      console.error("Sync cancelled.");
+      process.exitCode = 1;
+      return;
+    }
+    shouldBuild = !!buildChoice;
+  }
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
   if (!configPath) {
     console.error("Config selection cancelled.");
@@ -25,6 +39,11 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const resourceEnabled = config.packSelection?.resource !== false;
   const behaviorSrc = behaviorEnabled ? resolve(buildDir, config.packs.behavior) : null;
   const resourceSrc = resourceEnabled ? resolve(buildDir, config.packs.resource) : null;
+
+  if (shouldBuild && !dryRun) {
+    console.log("Running build before sync...");
+    await handleBuild({ ...ctx, argv: [] });
+  }
 
   if (!(await pathExists(buildDir))) {
     console.error(`Build output not found: ${buildDir}`);

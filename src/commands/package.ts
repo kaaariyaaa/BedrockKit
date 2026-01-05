@@ -1,13 +1,28 @@
 import { resolve, dirname } from "node:path";
 import { stat } from "node:fs/promises";
+import { confirm, isCancel } from "@clack/prompts";
 import { loadConfig } from "../config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
+import { handleBuild } from "./build.js";
 
 export async function handlePackage(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  let shouldBuild = parsed.flags.build !== false; // default true
+  if (parsed.flags.build === undefined) {
+    const buildChoice = await confirm({
+      message: "Run build before packaging?",
+      initialValue: true,
+    });
+    if (isCancel(buildChoice)) {
+      console.error("Packaging cancelled.");
+      process.exitCode = 1;
+      return;
+    }
+    shouldBuild = !!buildChoice;
+  }
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
   if (!configPath) {
     console.error("Config selection cancelled.");
@@ -27,6 +42,11 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
     ? resolve(configDir, config.paths.root)
     : configDir;
   const buildDir = resolve(rootDir, config.build.outDir ?? "dist");
+
+  if (shouldBuild) {
+    console.log("Running build before packaging...");
+    await handleBuild({ ...ctx, argv: [] });
+  }
 
   if (!(await pathExists(buildDir))) {
     console.error(`Build directory not found: ${buildDir}`);
