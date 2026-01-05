@@ -13,8 +13,10 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const dryRun = !!parsed.flags["dry-run"];
   const jsonOut = !!parsed.flags.json;
+  const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
+  const log = jsonOut || quiet ? (_msg?: unknown) => {} : console.log;
   let shouldBuild = parsed.flags.build !== false; // default true
-  if (parsed.flags.build === undefined && !dryRun && !jsonOut) {
+  if (parsed.flags.build === undefined && !dryRun && !jsonOut && !quiet) {
     const buildChoice = await confirm({
       message: "Run build before sync?",
       initialValue: true,
@@ -42,8 +44,11 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const resourceSrc = resourceEnabled ? resolve(buildDir, config.packs.resource) : null;
 
   if (shouldBuild && !dryRun) {
-    if (!jsonOut) console.log("Running build before sync...");
-    await handleBuild({ ...ctx, argv: jsonOut ? ["--json"] : [] });
+    log("Running build before sync...");
+    const forward: string[] = [];
+    if (jsonOut) forward.push("--json");
+    if (quiet) forward.push("--quiet");
+    await handleBuild({ ...ctx, argv: forward });
   }
 
   if (!(await pathExists(buildDir))) {
@@ -98,7 +103,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     const projectName = targetConfig.projectName ?? config.project.name;
     if (dryRun) {
       if (!jsonOut) {
-        console.log(
+        log(
           `[dry-run] Would deploy via core-build-tasks to ${targetConfig.product} as ${projectName}`,
         );
       } else {
@@ -125,9 +130,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     };
     try {
       await Promise.resolve(copyTask(params)());
-      console.log(
-        `Synced via core-build-tasks to ${targetConfig.product} (project: ${projectName})`,
-      );
+      log(`Synced via core-build-tasks to ${targetConfig.product} (project: ${projectName})`);
     } catch (err) {
       console.error(
         `Sync failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -160,7 +163,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   for (const { from, to } of tasks) {
     if (dryRun) {
       if (!jsonOut) {
-        console.log(`[dry-run] Would sync ${from} -> ${to}`);
+        log(`[dry-run] Would sync ${from} -> ${to}`);
       }
       synced.push({ from, to });
       continue;
@@ -168,7 +171,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     await ensureDir(dirname(to));
     await rm(to, { recursive: true, force: true });
     await cp(from, to, { recursive: true, force: true });
-    if (!jsonOut) console.log(`Synced ${from} -> ${to}`);
+    if (!jsonOut) log(`Synced ${from} -> ${to}`);
     synced.push({ from, to });
   }
   if (jsonOut) {

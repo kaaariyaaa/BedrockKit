@@ -11,6 +11,8 @@ import { handleBuild } from "./build.js";
 export async function handlePackage(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const jsonOut = !!parsed.flags.json;
+  const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
+  const log = jsonOut || quiet ? (_msg?: unknown) => {} : console.log;
   let shouldBuild = parsed.flags.build !== false; // default true
   if (parsed.flags.build === undefined) {
     if (!jsonOut) {
@@ -47,8 +49,11 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   const buildDir = resolve(rootDir, config.build.outDir ?? "dist");
 
   if (shouldBuild) {
-    if (!jsonOut) console.log("Running build before packaging...");
-    await handleBuild({ ...ctx, argv: jsonOut ? ["--json"] : [] });
+    log("Running build before packaging...");
+    const forwardFlags = [];
+    if (jsonOut) forwardFlags.push("--json");
+    if (quiet) forwardFlags.push("--quiet");
+    await handleBuild({ ...ctx, argv: forwardFlags });
   }
 
   if (!(await pathExists(buildDir))) {
@@ -72,7 +77,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   const resourceOut = resolve(buildDir, `${baseName}_resource.mcpack`);
 
   if (!jsonOut) {
-    console.log(`Packaging '${buildDir}' -> '${behaviorOut}', '${resourceOut}' ...`);
+    log(`Packaging '${buildDir}' -> '${behaviorOut}', '${resourceOut}' ...`);
   }
   const produced: string[] = [];
   try {
@@ -87,7 +92,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [behaviorPath], targetPath: "" },
       ]);
       await runTask(behaviorTask);
-      if (!jsonOut) console.log("Behavior pack created:", behaviorOut);
+      if (!jsonOut) log(`Behavior pack created: ${behaviorOut}`);
       produced.push(behaviorOut);
     }
     if (resourceEnabled && resourcePath) {
@@ -95,7 +100,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [resourcePath], targetPath: "" },
       ]);
       await runTask(resourceTask);
-      if (!jsonOut) console.log("Resource pack created:", resourceOut);
+      if (!jsonOut) log(`Resource pack created: ${resourceOut}`);
       produced.push(resourceOut);
     }
 
@@ -107,7 +112,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [resourcePath], targetPath: "resource_pack" },
       ]);
       await runTask(addonTask);
-      if (!jsonOut) console.log("Mcaddon created:", addonOut);
+      if (!jsonOut) log(`Mcaddon created: ${addonOut}`);
       produced.push(addonOut);
     }
     if (jsonOut) {
