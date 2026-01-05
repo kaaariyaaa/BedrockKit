@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { resolve, dirname, basename, relative } from "node:path";
 import { readdir } from "node:fs/promises";
 import { select, isCancel } from "@clack/prompts";
 import { pathExists } from "./fs.js";
@@ -26,9 +26,16 @@ export async function resolveConfigPath(flagPath?: string): Promise<string | nul
   }
   if (discovered.length === 1) return discovered[0];
 
-  const options = discovered.map((p) => ({ value: p, label: p }));
+  const cwdRel = (p: string) => relative(cwd, p).replace(/\\/g, "/");
+  const options = discovered.map((p) => {
+    const projectName = basename(dirname(p));
+    return {
+      value: p,
+      label: `${projectName} (${cwdRel(p)})`,
+    };
+  });
   const choice = await select({
-    message: "Select addon config",
+    message: "Select project",
     options,
   });
   if (isCancel(choice)) return null;
