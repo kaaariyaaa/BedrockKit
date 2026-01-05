@@ -5,6 +5,7 @@ import { handleConfig } from "./config.js";
 import { handleBump } from "./bump.js";
 import { handlePackage } from "./package.js";
 import { handleBuild } from "./build.js";
+import { handleDeps } from "./deps.js";
 import type { Command } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
@@ -42,6 +43,11 @@ export function buildCommands(onHelp: () => void): Command[] {
       name: "package",
       description: "Package build artifacts into distributable archives (zip)",
       run: handlePackage,
+    },
+    {
+      name: "deps",
+      description: "Sync Script API npm dependencies into config/manifest",
+      run: handleDeps,
     },
     {
       name: "sync",
