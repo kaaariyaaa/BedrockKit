@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, stat, writeFile, rm } from "node:fs/promises";
 import { dirname, extname, join, resolve, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
@@ -8,6 +8,7 @@ import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists, writeJson } from "../utils/fs.js";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
+import { convertJsTreeToTs } from "../utils/js-to-ts.js";
 
 type PackKind = "behavior" | "resource";
 
@@ -92,6 +93,10 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
   const unquote = (v: string) => v.replace(/^['"](.+)['"]$/, "$1").trim();
   const skipInstall = !!parsed.flags["skip-install"];
   const force = !!parsed.flags.force;
+  const convertFlag = parsed.flags["convert-ts"];
+  const noConvertFlag = parsed.flags["no-convert-ts"];
+  let convertTs: boolean | undefined =
+    convertFlag !== undefined ? true : noConvertFlag !== undefined ? false : undefined;
   let resolvedDeps: ScriptDependency[] = [];
 
   if (!archivePath) {
@@ -197,6 +202,31 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     await ensureDir(resolve(targetDir, "packs/behavior"));
     await ensureDir(resolve(targetDir, "packs/resource"));
 
+    // Optional: convert scripts to TS (all .js under scripts)
+    if (behaviorPath && scriptInfo?.entry?.endsWith(".js")) {
+      if (convertTs === undefined) {
+        const choice = await confirm({
+          message: "Convert scripts to TypeScript (.js -> .ts)? (optional; may require manual fixes)",
+          initialValue: false,
+        });
+        if (isCancel(choice)) {
+          outro("Cancelled.");
+          return;
+        }
+        convertTs = !!choice;
+      }
+    }
+
+    if (behaviorPath && convertTs) {
+      const scriptsDir = resolve(targetDir, "packs/behavior", "scripts");
+      await convertJsTreeToTs(scriptsDir);
+      // Adjust entry to .ts if originally .js
+      if (scriptInfo?.entry?.endsWith(".js")) {
+        const tsEntry = scriptInfo.entry.replace(/\.js$/, ".ts");
+        scriptInfo = { ...scriptInfo, entry: tsEntry, language: "typescript" };
+      }
+    }
+
     // build config
     const config = {
       project: { name: projectName, version: "1.0.0" },
@@ -229,7 +259,7 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
         scriptInfo?.entry && behaviorPath
           ? {
               entry: scriptInfo.entry,
-              language: "javascript" as const,
+              language: scriptInfo.language === "typescript" ? "typescript" : "javascript",
               dependencies: scriptInfo.deps ?? [],
             }
           : undefined,

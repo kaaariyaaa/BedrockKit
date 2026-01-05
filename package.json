@@ -32,11 +32,14 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@babel/parser": "^7.28.5",
     "@clack/prompts": "^0.11.0",
     "boxen": "^8.0.1",
     "chokidar": "^3.6.0",
     "figlet": "^1.9.4",
     "gradient-string": "^3.0.0",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "recast": "^0.23.11",
+    "ts-morph": "^23.0.0"
   }
 }
