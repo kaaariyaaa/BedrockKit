@@ -7,6 +7,7 @@ import { handlePackage } from "./package.js";
 import { handleBuild } from "./build.js";
 import { handleDeps } from "./deps.js";
 import { handleSync } from "./sync.js";
+import { handleImport } from "./import.js";
 import type { Command } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
@@ -28,6 +29,11 @@ export function buildCommands(onHelp: () => void): Command[] {
       name: "template",
       description: "Manage templates (list/add/rm) for project scaffolding",
       run: handleTemplate,
+    },
+    {
+      name: "import",
+      description: "Import existing mcpack/mcaddon/zip into a project workspace",
+      run: handleImport,
     },
 
     {

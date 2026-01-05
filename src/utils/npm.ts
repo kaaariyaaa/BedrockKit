@@ -45,7 +45,11 @@ export async function fetchNpmVersionChannels(
   };
   const seenBase = new Set<string>();
   try {
-    const res = await fetch(url);
+    // タイムアウト設定（10秒）でハングを防止
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) return result;
     const data = (await res.json()) as { versions?: Record<string, unknown> };
     const versions = Object.keys(data.versions ?? {}).sort(compareSemverDesc);

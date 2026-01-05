@@ -1,6 +1,5 @@
 import { dirname, resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import { multiselect, select, text, isCancel, outro } from "@clack/prompts";
 import { loadConfig } from "../config.js";
 import type { CommandContext, ScriptDependency } from "../types.js";
@@ -9,6 +8,7 @@ import { pathExists, writeJson } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
 import type { Manifest } from "../manifest.js";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
+import { runInstallCommand } from "../utils/npm-install.js";
 
 const SCRIPT_API_PACKAGES = new Set([
   "@minecraft/server",
@@ -182,11 +182,11 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   // Apply changes via npm uninstall/install so package.json と node_modules を揃える
   if (toRemove.length) {
     console.log(`npm uninstall ${toRemove.join(" ")}`);
-    await runNpm(rootDir, ["uninstall", ...toRemove]);
+    await runInstallCommand(rootDir, [], { cmd: "npm", args: ["uninstall", ...toRemove] });
   }
   if (toAdd.length) {
     console.log(`npm install ${toAdd.join(" ")}`);
-    await runNpm(rootDir, ["install", ...toAdd]);
+    await runInstallCommand(rootDir, toAdd);
   }
   if (!toRemove.length && !toAdd.length) {
     console.log("No changes to npm dependencies.");
@@ -220,36 +220,4 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   await writeJson(behaviorManifestPath, behaviorManifest);
 
   console.log("Updated package.json, config, and manifest with selected Script API packages.");
-}
-
-function runNpm(cwd: string, args: string[]): Promise<void> {
-  const isWin = process.platform === "win32";
-  return new Promise((resolve, reject) => {
-    const run = (useShell: boolean, reason?: string) => {
-      if (useShell && reason) {
-        console.warn(`Falling back to shell for npm (${reason})`);
-      }
-      const child = spawn("npm", args, {
-        cwd,
-        stdio: "inherit",
-        shell: useShell || isWin,
-      });
-      child.on("error", (err) => {
-        if (!useShell && (err as NodeJS.ErrnoException).code === "EINVAL") {
-          run(true, "EINVAL");
-        } else {
-          reject(err);
-        }
-      });
-      child.on("exit", (code) => {
-        if (code === 0) return resolve();
-        if (!useShell) {
-          run(true, `exit ${code}`);
-        } else {
-          reject(new Error(`npm ${args.join(" ")} exited with code ${code}`));
-        }
-      });
-    };
-    run(false);
-  });
 }

@@ -21,8 +21,8 @@ import type { CommandContext, ScriptApiSelection, ScriptApiVersionMap } from "..
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
 import { writeFile, cp } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
+import { runInstallCommand } from "../utils/npm-install.js";
 
 const cwd = process.cwd();
 
@@ -564,57 +564,18 @@ function buildTsConfig(scriptEntry: string) {
 }
 
 function runInstall(cwd: string, label: string): Promise<void> {
-  const isWin = process.platform === "win32";
   const normalizeLabel = label.trim().toLowerCase();
-
-  const parseLabel = (): { cmd: string; args: string[]; shell: boolean } => {
-    if (normalizeLabel.startsWith("npm ci")) {
-      return { cmd: "npm", args: ["ci"], shell: isWin };
-    }
-    if (normalizeLabel.startsWith("npm install")) {
-      return { cmd: "npm", args: ["install"], shell: isWin };
-    }
-    if (normalizeLabel.startsWith("pnpm install")) {
-      return { cmd: "pnpm", args: ["install"], shell: true };
-    }
-    if (normalizeLabel.startsWith("yarn install")) {
-      return { cmd: "yarn", args: ["install"], shell: true };
-    }
-    return { cmd: "npm", args: ["install"], shell: isWin };
-  };
-
-  return new Promise((resolve, reject) => {
-    const { cmd, args, shell } = parseLabel();
-
-    const run = (useShell: boolean, reason?: string) => {
-      if (useShell && reason) {
-        console.warn(`Falling back to shell install (${reason})`);
-      }
-      const child = spawn(cmd, args, {
-        cwd,
-        stdio: "inherit",
-        shell: useShell || shell,
-      });
-
-      child.on("error", (err) => {
-        if (!useShell && (err as NodeJS.ErrnoException).code === "EINVAL") {
-          run(true, "EINVAL");
-        } else {
-          reject(err);
-        }
-      });
-
-      child.on("exit", (code) => {
-        if (code === 0) {
-          resolve();
-        } else if (!useShell) {
-          run(true, `exit ${code}`);
-        } else {
-          reject(new Error(`${label} exited with code ${code}`));
-        }
-      });
-    };
-
-    run(false);
-  });
+  if (normalizeLabel.startsWith("npm ci")) {
+    return runInstallCommand(cwd, [], { args: ["ci"] });
+  }
+  if (normalizeLabel.startsWith("npm install")) {
+    return runInstallCommand(cwd, [], { args: ["install"] });
+  }
+  if (normalizeLabel.startsWith("pnpm install")) {
+    return runInstallCommand(cwd, [], { cmd: "pnpm", args: ["install"], shell: true });
+  }
+  if (normalizeLabel.startsWith("yarn install")) {
+    return runInstallCommand(cwd, [], { cmd: "yarn", args: ["install"], shell: true });
+  }
+  return runInstallCommand(cwd, [], { args: ["install"] });
 }
