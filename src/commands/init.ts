@@ -53,6 +53,12 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     debugUtilities: false,
     vanillaData: false,
   };
+  const eslintRulesFlag = parsed.flags["eslint-rules"] as string | undefined;
+  const disableEslint = !!parsed.flags["no-eslint"];
+  const availableEslintRules = ["minecraft-linting/avoid-unnecessary-command"];
+  let eslintRules: string[] =
+    eslintRulesFlag?.split(",").map((s) => s.trim()).filter(Boolean) ??
+    (disableEslint ? [] : [...availableEslintRules]);
   let skipInstall = !!parsed.flags["skip-install"];
   let installStatus: "skipped" | "completed" | "failed" = skipInstall
     ? "skipped"
@@ -136,6 +142,19 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       return;
     }
     includeScript = !!scriptChoice;
+  }
+
+  if (includeScript && !nonInteractive && !disableEslint && !eslintRulesFlag) {
+    const ruleChoice = await multiselect({
+      message: "Enable ESLint rules (space to toggle)",
+      options: availableEslintRules.map((r) => ({ value: r, label: r })),
+      initialValues: availableEslintRules,
+    });
+    if (isCancel(ruleChoice)) {
+      outro("Cancelled.");
+      return;
+    }
+    eslintRules = ruleChoice as string[];
   }
 
   if (includeScript && !nonInteractive && parsed.flags["script-api-version"] === undefined) {
@@ -446,6 +465,31 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     }
     await writeJson(configPath, config);
     await writeFile(resolve(targetDir, ".bkitignore"), `${bkitIgnore}\n`, { encoding: "utf8" });
+    // ESLint config (TS + minecraft-linting)
+    const eslintConfig = `import minecraftLinting from "eslint-plugin-minecraft-linting";
+import tsParser from "@typescript-eslint/parser";
+import ts from "@typescript-eslint/eslint-plugin";
+
+export default [
+  {
+    files: ["packs/behavior/scripts/**/*.ts"],
+    languageOptions: {
+      parser: tsParser,
+      ecmaVersion: "latest",
+    },
+    plugins: {
+      ts,
+      "minecraft-linting": minecraftLinting,
+    },
+    rules: {
+${eslintRules
+  .map((r) => `      "${r}": "error",`)
+  .join("\n") || "      // no rules enabled"}
+    },
+  },
+];
+`;
+    await writeFile(resolve(targetDir, "eslint.config.js"), eslintConfig, { encoding: "utf8" });
     await ensureDir(resolve(targetDir, "dist"));
     if (includeScript && packSelection.behavior) {
       const scriptPath = resolve(targetDir, "packs/behavior", scriptEntry);
@@ -543,9 +587,14 @@ function buildPackageJson(
     },
     devDependencies: {
       typescript: "^5.3.3",
+      eslint: "^9.14.0",
+      "@typescript-eslint/parser": "^8.13.0",
+      "@typescript-eslint/eslint-plugin": "^8.13.0",
+      "eslint-plugin-minecraft-linting": "^1.0.0",
     },
     scripts: {
       typecheck: "tsc --noEmit",
+      lint: "eslint \"packs/behavior/scripts/**/*.{ts,js}\"",
     },
   };
 }

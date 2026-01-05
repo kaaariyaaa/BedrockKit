@@ -73,7 +73,7 @@ project/<addon-name>/
 ```
 
 ## 主なコマンド
-- `bkit init` (`new`) – テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。
+- `bkit init` (`new`) – テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。ESLint ルール（例: `minecraft-linting/avoid-unnecessary-command`）は有効/無効を対話選択でき、フラグ `--eslint-rules <csv>` / `--no-eslint` でも指定可能。
 - `bkit import <mcpack|mcaddon|zip>` – 既存アーカイブを展開し、`bkit.config.json` を生成してワークスペース化。JS→TS 変換はオプション（`--convert-ts` / `--no-convert-ts`、未指定時は対話確認）。自動変換は互換性リスクがあるため、必要な場合のみ利用推奨。
 - `bkit build [--out-dir <dir>]` – ビヘイビア/リソースパックを `dist/` にコピー。スクリプトエントリが TypeScript の場合は `@minecraft/core-build-tasks` でバンドル。
 - `bkit package [--out <name>]` – `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。必要に応じて事前に build を実行。

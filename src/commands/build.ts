@@ -6,6 +6,7 @@ import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
 import { loadIgnoreRules, isIgnored } from "../utils/ignore.js";
+import { spawn } from "node:child_process";
 
 function shouldSkipTsScript(entryRel: string, scriptEntry: string | undefined, src: string, root: string): boolean {
   if (!scriptEntry) return false;
@@ -53,6 +54,16 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
   await rm(outDir, { recursive: true, force: true });
 
   const scriptEntryRel = config.script?.entry;
+  // ESLint (if script present)
+  if (behaviorEnabled && config.script) {
+    try {
+      await runEslint(rootDir, quiet || jsonOut);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+      return;
+    }
+  }
   if (behaviorEnabled && config.script && scriptEntryRel) {
     const entryAbs = resolve(behaviorSrc!, scriptEntryRel);
     const outFile = resolve(
@@ -148,5 +159,26 @@ function runTask(task: (done: (err?: unknown) => void) => unknown): Promise<void
     if (maybePromise && typeof (maybePromise as Promise<unknown>).then === "function") {
       (maybePromise as Promise<unknown>).then(() => resolve()).catch((err) => reject(err));
     }
+  });
+}
+
+async function runEslint(rootDir: string, quiet: boolean): Promise<void> {
+  const eslintPath = resolve(rootDir, "node_modules/.bin/eslint");
+  if (!(await pathExists(eslintPath))) {
+    throw new Error("eslint not found in project. Run npm install.");
+  }
+  const args = ["packs/behavior/scripts/**/*.{ts,js}"];
+  const useShell = process.platform === "win32";
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(eslintPath, args, {
+      cwd: rootDir,
+      stdio: quiet ? "ignore" : "inherit",
+      shell: useShell,
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`eslint exited with code ${code}`));
+    });
   });
 }
