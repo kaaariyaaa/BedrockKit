@@ -12,8 +12,9 @@ import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
 export async function handleSync(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const dryRun = !!parsed.flags["dry-run"];
+  const jsonOut = !!parsed.flags.json;
   let shouldBuild = parsed.flags.build !== false; // default true
-  if (parsed.flags.build === undefined && !dryRun) {
+  if (parsed.flags.build === undefined && !dryRun && !jsonOut) {
     const buildChoice = await confirm({
       message: "Run build before sync?",
       initialValue: true,
@@ -41,8 +42,8 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const resourceSrc = resourceEnabled ? resolve(buildDir, config.packs.resource) : null;
 
   if (shouldBuild && !dryRun) {
-    console.log("Running build before sync...");
-    await handleBuild({ ...ctx, argv: [] });
+    if (!jsonOut) console.log("Running build before sync...");
+    await handleBuild({ ...ctx, argv: jsonOut ? ["--json"] : [] });
   }
 
   if (!(await pathExists(buildDir))) {
@@ -90,13 +91,20 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
 
   const targetConfig = targets[targetName!];
 
+  const synced: { from: string; to?: string; product?: string; projectName?: string }[] = [];
+
   // If product is specified, use core-build-tasks copyTask (MCBEAddonTemplate style).
   if (targetConfig.product) {
     const projectName = targetConfig.projectName ?? config.project.name;
     if (dryRun) {
-      console.log(
-        `[dry-run] Would deploy via core-build-tasks to ${targetConfig.product} as ${projectName}`,
-      );
+      if (!jsonOut) {
+        console.log(
+          `[dry-run] Would deploy via core-build-tasks to ${targetConfig.product} as ${projectName}`,
+        );
+      } else {
+        synced.push({ from: buildDir, product: targetConfig.product, projectName });
+        console.log(JSON.stringify({ ok: true, dryRun: true, synced }, null, 2));
+      }
       return;
     }
     process.env.PROJECT_NAME = projectName;
@@ -126,6 +134,10 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
       );
       process.exitCode = 1;
     }
+    if (jsonOut) {
+      synced.push({ from: buildDir, product: targetConfig.product, projectName });
+      console.log(JSON.stringify({ ok: process.exitCode !== 1, synced }, null, 2));
+    }
     return;
   }
 
@@ -147,12 +159,19 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
 
   for (const { from, to } of tasks) {
     if (dryRun) {
-      console.log(`[dry-run] Would sync ${from} -> ${to}`);
+      if (!jsonOut) {
+        console.log(`[dry-run] Would sync ${from} -> ${to}`);
+      }
+      synced.push({ from, to });
       continue;
     }
     await ensureDir(dirname(to));
     await rm(to, { recursive: true, force: true });
     await cp(from, to, { recursive: true, force: true });
-    console.log(`Synced ${from} -> ${to}`);
+    if (!jsonOut) console.log(`Synced ${from} -> ${to}`);
+    synced.push({ from, to });
+  }
+  if (jsonOut) {
+    console.log(JSON.stringify({ ok: true, dryRun, synced }, null, 2));
   }
 }

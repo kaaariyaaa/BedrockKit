@@ -10,18 +10,21 @@ import { handleBuild } from "./build.js";
 
 export async function handlePackage(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const jsonOut = !!parsed.flags.json;
   let shouldBuild = parsed.flags.build !== false; // default true
   if (parsed.flags.build === undefined) {
-    const buildChoice = await confirm({
-      message: "Run build before packaging?",
-      initialValue: true,
-    });
-    if (isCancel(buildChoice)) {
-      console.error("Packaging cancelled.");
-      process.exitCode = 1;
-      return;
+    if (!jsonOut) {
+      const buildChoice = await confirm({
+        message: "Run build before packaging?",
+        initialValue: true,
+      });
+      if (isCancel(buildChoice)) {
+        console.error("Packaging cancelled.");
+        process.exitCode = 1;
+        return;
+      }
+      shouldBuild = !!buildChoice;
     }
-    shouldBuild = !!buildChoice;
   }
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
   if (!configPath) {
@@ -44,8 +47,8 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   const buildDir = resolve(rootDir, config.build.outDir ?? "dist");
 
   if (shouldBuild) {
-    console.log("Running build before packaging...");
-    await handleBuild({ ...ctx, argv: [] });
+    if (!jsonOut) console.log("Running build before packaging...");
+    await handleBuild({ ...ctx, argv: jsonOut ? ["--json"] : [] });
   }
 
   if (!(await pathExists(buildDir))) {
@@ -68,7 +71,10 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   const behaviorOut = resolve(buildDir, `${baseName}_behavior.mcpack`);
   const resourceOut = resolve(buildDir, `${baseName}_resource.mcpack`);
 
-  console.log(`Packaging '${buildDir}' -> '${behaviorOut}', '${resourceOut}' ...`);
+  if (!jsonOut) {
+    console.log(`Packaging '${buildDir}' -> '${behaviorOut}', '${resourceOut}' ...`);
+  }
+  const produced: string[] = [];
   try {
     const zipTask = await getZipTask();
   const behaviorEnabled = config.packSelection?.behavior !== false;
@@ -81,14 +87,16 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [behaviorPath], targetPath: "" },
       ]);
       await runTask(behaviorTask);
-      console.log("Behavior pack created:", behaviorOut);
+      if (!jsonOut) console.log("Behavior pack created:", behaviorOut);
+      produced.push(behaviorOut);
     }
     if (resourceEnabled && resourcePath) {
       const resourceTask = zipTask(resourceOut, [
         { contents: [resourcePath], targetPath: "" },
       ]);
       await runTask(resourceTask);
-      console.log("Resource pack created:", resourceOut);
+      if (!jsonOut) console.log("Resource pack created:", resourceOut);
+      produced.push(resourceOut);
     }
 
     // If both exist, also create mcaddon bundle.
@@ -99,7 +107,11 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [resourcePath], targetPath: "resource_pack" },
       ]);
       await runTask(addonTask);
-      console.log("Mcaddon created:", addonOut);
+      if (!jsonOut) console.log("Mcaddon created:", addonOut);
+      produced.push(addonOut);
+    }
+    if (jsonOut) {
+      console.log(JSON.stringify({ ok: true, buildDir, artifacts: produced }, null, 2));
     }
   } catch (err) {
     console.error(

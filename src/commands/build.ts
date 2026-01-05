@@ -15,6 +15,7 @@ function shouldSkipTsScript(entryRel: string, scriptEntry: string | undefined, s
 
 export async function handleBuild(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
+  const jsonOut = !!parsed.flags.json;
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
   if (!configPath) {
     console.error("Config selection cancelled.");
@@ -68,7 +69,7 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
       external: externals,
       minifyWhitespace: false,
     });
-    console.log(`Bundling script: ${entryAbs} -> ${outFile}`);
+    if (!jsonOut) console.log(`Bundling script: ${entryAbs} -> ${outFile}`);
     await runTask(bundle);
   }
 
@@ -109,7 +110,11 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  console.log(`Build completed -> ${outDir}`);
+  if (jsonOut) {
+    console.log(JSON.stringify({ ok: true, outDir }, null, 2));
+  } else {
+    console.log(`Build completed -> ${outDir}`);
+  }
 }
 
 async function getBundleTask(): Promise<
