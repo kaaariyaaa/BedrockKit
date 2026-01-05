@@ -77,7 +77,12 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
     }
   }
 
+  const uuidSet = new Set<string>();
+
   if (behaviorManifest && resourceManifest) {
+    issues.push(...validateManifestShape(behaviorManifest, "behavior", uuidSet));
+    issues.push(...validateManifestShape(resourceManifest, "resource", uuidSet));
+
     const behaviorDependsOnResource = (behaviorManifest.dependencies ?? []).some(
       (dep) => "uuid" in dep && dep.uuid === resourceManifest!.header.uuid,
     );
@@ -135,6 +140,62 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
   }
 
   report(issues, { json: jsonOut, configPath });
+}
+
+function validateVersionTuple(tuple: unknown, context: string, issues: string[]): void {
+  if (
+    !Array.isArray(tuple) ||
+    tuple.length !== 3 ||
+    !tuple.every((n) => Number.isInteger(n) && n >= 0)
+  ) {
+    issues.push(`${context} version must be a tuple of three non-negative integers`);
+  }
+}
+
+function validateManifestShape(
+  manifest: Manifest,
+  kind: "behavior" | "resource",
+  seenUuids: Set<string>,
+): string[] {
+  const issues: string[] = [];
+  if (manifest.format_version !== 2) {
+    issues.push(`${kind} manifest format_version should be 2`);
+  }
+  if (!manifest.header?.uuid) {
+    issues.push(`${kind} manifest header.uuid is missing`);
+  } else if (seenUuids.has(manifest.header.uuid)) {
+    issues.push(`${kind} manifest header.uuid duplicates another UUID`);
+  } else {
+    seenUuids.add(manifest.header.uuid);
+  }
+  validateVersionTuple(manifest.header?.version, `${kind} manifest header`, issues);
+  validateVersionTuple(
+    manifest.header?.min_engine_version,
+    `${kind} manifest header.min_engine_version`,
+    issues,
+  );
+  if (!manifest.modules || !manifest.modules.length) {
+    issues.push(`${kind} manifest modules are missing`);
+  } else {
+    for (const mod of manifest.modules) {
+      if (!mod.uuid) {
+        issues.push(`${kind} manifest module missing uuid`);
+      } else if (seenUuids.has(mod.uuid)) {
+        issues.push(`${kind} manifest module uuid duplicates another UUID`);
+      } else {
+        seenUuids.add(mod.uuid);
+      }
+      validateVersionTuple(mod.version, `${kind} manifest module`, issues);
+      if (
+        mod.type !== "data" &&
+        mod.type !== "resources" &&
+        mod.type !== "script"
+      ) {
+        issues.push(`${kind} manifest module type '${(mod as any).type}' is invalid`);
+      }
+    }
+  }
+  return issues;
 }
 
 function report(
