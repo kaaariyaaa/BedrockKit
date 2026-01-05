@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, extname } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { BkitConfig } from "./types.js";
 import { pathExists } from "./utils/fs.js";
 
@@ -9,8 +10,20 @@ export async function loadConfig(path: string = defaultConfigPath): Promise<Bkit
   if (!(await pathExists(path))) {
     throw new Error(`Config not found at ${path}`);
   }
-  const raw = await readFile(path, { encoding: "utf8" });
-  return JSON.parse(raw) as BkitConfig;
+
+  const ext = extname(path).toLowerCase();
+  if (ext === ".json") {
+    const raw = await readFile(path, { encoding: "utf8" });
+    return JSON.parse(raw) as BkitConfig;
+  }
+
+  // Allow ESM config (bkit.config.ts/mjs/js)
+  const mod = await import(pathToFileURL(path).href);
+  const cfg = (mod.default ?? mod.config ?? mod) as BkitConfig;
+  if (!cfg) {
+    throw new Error(`Config module did not export a config object: ${path}`);
+  }
+  return cfg;
 }
 
 export function validateConfig(config: BkitConfig): string[] {
