@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { intro, isCancel, outro, select } from "@clack/prompts";
+import pc from "picocolors";
 import { buildCommands } from "./commands/index.js";
+import { printBanner, printCommandHeader } from "./utils/ui.js";
 import { printHelp } from "./help.js";
 import type { Command } from "./types.js";
 
@@ -26,9 +28,11 @@ function findCommand(name?: string): Command | undefined {
 }
 
 async function runInteractive(): Promise<void> {
-  intro(`BedrockKit CLI${pkg.version ? ` v${pkg.version}` : ""}`);
+  printBanner();
+  intro(pc.inverse(" Interactive Mode "));
+  
   const choice = await select({
-    message: "Select a command to run",
+    message: "What would you like to do?",
     options: commands
       .filter((cmd) => cmd.name !== "help")
       .map((cmd) => ({
@@ -85,6 +89,7 @@ async function main(): Promise<void> {
     return;
   }
 
+  printCommandHeader(cmd.name, cmd.description);
   await Promise.resolve(cmd.run({ argv: rest, root }));
 }
 

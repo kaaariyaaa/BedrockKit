@@ -7,7 +7,9 @@ import {
   spinner,
   text,
   multiselect,
+  log, // Import log
 } from "@clack/prompts";
+import pc from "picocolors";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import {
@@ -118,7 +120,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       resource: set.has("resource"),
     };
     if (!packSelection.behavior && !packSelection.resource) {
-      console.error("At least one pack must be selected.");
+      log.error("At least one pack must be selected.");
       process.exitCode = 1;
       return;
     }
@@ -308,7 +310,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   }
 
   if (!force && !isDirEmpty(targetDir)) {
-    console.error(
+    log.error(
       `Target directory ${targetDir} is not empty. Use --force to initialize anyway.`,
     );
     process.exitCode = 1;
@@ -316,8 +318,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   }
 
   const registry = await loadTemplateRegistry();
-
-  intro("Initializing workspace");
+  
+  // Note: We don't verify if we are in interactive mode to clear screen, 
+  // but let's just make the intro nice.
+  intro(pc.inverse(" BedrockKit Init "));
+  
   const spin = spinner();
   spin.start("Generating manifests and config");
 
@@ -470,11 +475,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       installStatus = "completed";
     } catch (err) {
       installSpin.stop("Failed to install dependencies (continuing without install)");
-      console.error(err instanceof Error ? err.message : String(err));
+      log.error(err instanceof Error ? err.message : String(err));
       installStatus = "failed";
     }
   } else if (includeScript) {
-    console.log("Skipped dependency install (use --skip-install to control this).");
+    log.info("Skipped dependency install (use --skip-install to control this).");
   }
 
   outro(

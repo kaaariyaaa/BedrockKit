@@ -25,12 +25,18 @@
   },
   "devDependencies": {
     "@minecraft/core-build-tasks": "^5.5.0",
+    "@types/figlet": "^1.7.0",
+    "@types/gradient-string": "^1.1.6",
     "@types/node": "^25.0.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
-    "chokidar": "^3.6.0"
+    "boxen": "^8.0.1",
+    "chokidar": "^3.6.0",
+    "figlet": "^1.9.4",
+    "gradient-string": "^3.0.0",
+    "picocolors": "^1.1.1"
   }
 }

@@ -1,49 +1,109 @@
-# BedrockKit CLI
+# BedrockKit
 
-Minecraft Bedrock Edition のアドオン開発を効率化する CLI です。プロジェクト初期化からビルド・同期・パッケージ化・既存アーカイブの取り込みまでをカバーします。
+Minecraft Bedrock Edition 向けのアドオン／リソースパック開発を一括で回すための CLI です。初期化・依存管理・ビルド・配布パッケージ作成・開発環境への同期までを `bkit` コマンドで扱えます。
 
-## 必要環境
-- Node.js 20 以降（LTS 推奨）
-- Git（テンプレート取得に使用）
-- 対応 OS: Windows / macOS（Linux はベストエフォート）
+## 動作要件
+- Node.js 20 以上
+- npm / git（テンプレート取得や依存インストールに使用）
+- Windows / macOS / Linux いずれでも利用可能。Sync でゲームの開発用フォルダへコピーする際は、対象環境に合わせた権限が必要です。
 
-## セットアップ
+## インストール
+リポジトリを取得後、依存を入れてグローバルにリンクします。
+
 ```bash
 npm install
 npm run build
+npm install -g .   # もしくは npm link でローカルリンク
+```
+
+開発中にソースから直接試す場合は `npm run dev -- <command>` で `src/cli.ts` を起動できます。
+
+## クイックスタート
+```bash
+# プロジェクトを対話的に初期化（./project/<name> 以下に展開）
+bkit init
+
+# ビルドして dist/ に成果物を作成
+bkit build
+
+# ビルド成果物を開発用フォルダに同期
+bkit sync
+
+# 配布用 .mcpack/.mcaddon を作成
+bkit package
+```
+
+## 生成される構成例
+`bkit init` で作られる標準構成は次のとおりです。
+
+```
+project/<addon-name>/
+├─ bkit.config.json        # bkit の設定
+├─ .bkitignore             # ビルド/コピー時の除外設定
+├─ packs/
+│  ├─ behavior/            # ビヘイビアパック
+│  │  ├─ manifest.json
+│  │  └─ scripts/main.ts   # スクリプトエントリ（選択時）
+│  └─ resource/            # リソースパック
+│     └─ manifest.json
+└─ dist/                   # build/package の出力先
+```
+
+`bkit.config.json` の最小例:
+
+```json
+{
+  "project": { "name": "example-addon", "version": "1.0.0" },
+  "template": "bkit-default",
+  "packSelection": { "behavior": true, "resource": true },
+  "packs": { "behavior": "packs/behavior", "resource": "packs/resource" },
+  "build": { "outDir": "dist", "target": "dev" },
+  "sync": {
+    "defaultTarget": "gdk",
+    "targets": { "gdk": { "product": "BedrockGDK", "projectName": "example-addon" } }
+  },
+  "paths": { "root": "." },
+  "script": {
+    "entry": "packs/behavior/scripts/main.ts",
+    "language": "typescript",
+    "dependencies": [{ "module_name": "@minecraft/server", "version": "1.11.0" }],
+    "apiVersion": "1.11.0"
+  }
+}
 ```
 
 ## 主なコマンド
-- `init`  
-  プロジェクト雛形を生成。Behavior/Resource 選択、Script API 依存選択＆バージョン指定、GDK を既定とした sync 設定、`.bkitignore` 自動生成。テンプレートは公式サンプル or 登録済み Git テンプレを選択。
-- `build`  
-  `@minecraft/core-build-tasks` でスクリプトをバンドルし、packs を出力（`.bkitignore` 適用）。`--out-dir`、`--json`、`--quiet` 対応。
-- `package`  
-  mcpack/mcaddon を生成。デフォルトで事前ビルド実行（`--build=false` でスキップ）。`--json`/`--quiet` 対応。
-- `sync`  
-  ビルド成果を開発フォルダへ同期。`sync.targets` で product 指定（BedrockGDK/UWP など）またはパス指定可。`--build-dir`/`--out-dir` で出力指定。`--json`/`--quiet` 対応。
-- `watch`  
-  複数プロジェクトを選択して監視し、変更検知で専用 outDir（既定 `.watch-dist`）にビルド→同期を自動実行。`--projects`/`--out-dir`/`--quiet` 対応。
-- `deps`  
-  Script API 依存の選択とバージョン指定を対話で行い、npm uninstall/install で package.json・node_modules・config・manifest を同期。
-- `validate`  
-  config/manifest の検証。UUID 重複、必須フィールド、モジュール型、依存漏れなどをチェック。`--json` 対応。
-- `import`  
-  `.mcpack/.mcaddon/.zip` を取り込み、packs 配置・`bkit.config.json`/`.bkitignore` 生成。manifest の依存を解決して `npm ci` 優先でインストール（`--skip-install` でスキップ、`--force` で上書き）。
-- `template list/add/pull/rm`  
-  テンプレートレジストリ管理。Git 形式の URL を登録すると `init` で選択可能。
+- `bkit init` (`new`) – テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。
+- `bkit import <mcpack|mcaddon|zip>` – 既存アーカイブを展開し、`bkit.config.json` を生成してワークスペース化。
+- `bkit build [--out-dir <dir>]` – ビヘイビア/リソースパックを `dist/` にコピー。スクリプトエントリが TypeScript の場合は `@minecraft/core-build-tasks` でバンドル。
+- `bkit package [--out <name>]` – `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。必要に応じて事前に build を実行。
+- `bkit sync [--target <name>] [--build=false]` – ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` を指定すると core-build-tasks の `copyTask` で MC 開発環境へデプロイ。
+- `bkit deps` – 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `packs/behavior/manifest.json` を同期。
+- `bkit bump [major|minor|patch]` – プロジェクト/マニフェストのバージョンを一括更新。
+- `bkit validate [--strict] [--json]` – config と manifest の整合性チェック。
+- `bkit template <list|add|pull|rm>` – テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意リポジトリを登録可能。
+- `bkit watch` – `./project/<name>` 配下を監視し、変更ごとに `build --out-dir .watch-dist` → `sync --build=false --build-dir .watch-dist` を実行。
+- `bkit config [--path <file>] [--json]` – 読み込んだ設定を確認。
 
-## 設定と同期
-- `bkit.config.json`（または bkit.config.ts/mjs/js）でパスや sync ターゲットを管理。`sync.targets` に `product: BedrockGDK/BedrockUWP/...` を指定すると core-build-tasks の copyTask で開発フォルダへ配備。
-- `.bkitignore` は build 時のコピー除外リスト。`*`/`**` ワイルドカードと `#` コメントをサポート。
+## 同期ターゲットの書き方
+- **core-build-tasks 経由**（開発版 Minecraft へデプロイ）  
+  `sync.targets.<name>.product` に `BedrockUWP | PreviewUWP | BedrockGDK | PreviewGDK` を指定し、`projectName` で開発フォルダ名を上書き可能。
+- **パス指定コピー**  
+  `sync.targets.<name>.behavior` / `resource` にそれぞれのコピー先パスを記載。`bkit sync --dry-run` でコピー内容だけ確認できます。
 
-## よく使うフラグ
-- `--config <path>` 設定ファイル指定
-- `--json` 機械可読出力（build/package/sync/validate）
-- `--quiet` ログ抑制
-- `--build=false` sync/package で事前ビルドをスキップ
-- `--out-dir` / `--build-dir` ビルド出力先上書き（watch/sync 用）
+## テンプレート運用
+- 既定で `official-sample` が登録されています。`bkit template list` で確認できます。
+- 任意の Git リポジトリを `bkit template add <name> <git-url>` で登録し、`bkit init --template <name>` で利用できます。
+- `.bkit/templates/<name>` にクローンされるため、社内リポジトリ等も扱えます（SSH キーは `BKIT_SSH_KEY` 環境変数で指定可能）。
 
-## 補足
-- Script API の `@minecraft/math` / `@minecraft/vanilla-data` は manifest 依存に書かず、バンドル/インポートで扱います。
-- import で存在しないバージョン指定があれば、npm レジストリのプレフィックス一致や最新バージョンにフォールバックして解決を試みます。
+## 便利なオプション
+- どのコマンドでも `--config <path>` で対象プロジェクトを指定（複数プロジェクトがある場合は対話選択にも対応）。
+- 機械可読出力が欲しい場合は `--json`、静かに動かす場合は `-q | --quiet`。
+- `build`/`sync`/`package` 共通で `--build=false` を渡すと事前ビルドをスキップ。
+- `.bkitignore` に記載したパターンはビルド／同期時に無視されます。
+
+## よくある流れ
+1. `bkit init` で土台を作成（または `bkit import` で既存アドオンを取り込み）。
+2. `bkit build` で成果物を作成し、`bkit validate` で整合性確認。
+3. `bkit sync` でゲームの開発用フォルダに反映、`bkit watch` で自動同期しながら開発。
+4. リリース時に `bkit bump` でバージョンを上げ、`bkit package` で配布用アーカイブを生成。
