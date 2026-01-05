@@ -1,16 +1,40 @@
-import { confirm, isCancel } from "@clack/prompts";
-import { loadTemplateRegistry, saveTemplateRegistry, templateRegistryPath } from "../templates.js";
+import { confirm, isCancel, select, text } from "@clack/prompts";
+import {
+  loadTemplateRegistry,
+  saveTemplateRegistry,
+  templateRegistryPath,
+  cloneTemplate,
+} from "../templates.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
 export async function handleTemplate(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
-  const [sub] = parsed.positional;
+  let [sub] = parsed.positional;
   const registry = await loadTemplateRegistry();
+
+  if (!sub) {
+    const choice = await select({
+      message: "Template command",
+      options: [
+        { value: "list", label: "List" },
+        { value: "add", label: "Add(Git URL)" },
+        { value: "pull", label: "Update" },
+        { value: "rm", label: "Remove" },
+      ],
+      initialValue: "list",
+    });
+    if (isCancel(choice)) {
+      console.log("Aborted.");
+      return;
+    }
+    sub = String(choice);
+  }
+
   if (!sub || sub === "list") {
     console.log("[template] Known templates:");
     registry.forEach((t) =>
-      console.log(`- ${t.name.padEnd(16)} ${t.url}`),
+      console.log(`- ${t.name.padEnd(16)} ${t.url}${t.path ? ` (path: ${t.path})` : ""}`),
     );
     console.log(
       `Registry file: ${templateRegistryPath} (auto-created on add/remove)`,
@@ -19,8 +43,30 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
   }
 
   if (sub === "add") {
-    const name = parsed.positional[1];
-    const url = parsed.positional[2] ?? (parsed.flags.url as string | undefined);
+    let name = parsed.positional[1];
+    let url = parsed.positional[2] ?? (parsed.flags.url as string | undefined);
+    if (!name) {
+      const input = await text({
+        message: "Template name",
+        validate: (v) => (!v.trim() ? "Name is required" : undefined),
+      });
+      if (isCancel(input)) {
+        console.log("Aborted.");
+        return;
+      }
+      name = String(input).trim();
+    }
+    if (!url) {
+      const input = await text({
+        message: "Git URL",
+        validate: (v) => (!v.trim() ? "URL is required" : undefined),
+      });
+      if (isCancel(input)) {
+        console.log("Aborted.");
+        return;
+      }
+      url = String(input).trim();
+    }
     if (!name || !url) {
       console.error("Usage: template add <name> <git-url>");
       process.exitCode = 1;
@@ -31,9 +77,17 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    registry.push({ name, url });
-    await saveTemplateRegistry(registry);
-    console.log(`[template] Registered template '${name}' from ${url}`);
+    try {
+      const path = await cloneTemplate(name, url);
+      registry.push({ name, url, path });
+      await saveTemplateRegistry(registry);
+      console.log(`[template] Registered template '${name}' from ${url} (path: ${path})`);
+    } catch (err) {
+      console.error(
+        `[template] Failed to clone template: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exitCode = 1;
+    }
     return;
   }
 
@@ -60,6 +114,44 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
     }
     await saveTemplateRegistry(next);
     console.log(`[template] Removed template '${name}'`);
+    return;
+  }
+
+  if (sub === "pull") {
+    let name = parsed.positional[1];
+    if (!name) {
+      const input = await text({
+        message: "Template name to update",
+        validate: (v) => (!v.trim() ? "Name is required" : undefined),
+      });
+      if (isCancel(input)) {
+        console.log("Aborted.");
+        return;
+      }
+      name = String(input).trim();
+    }
+    if (!name) {
+      console.error("Usage: template pull <name>");
+      process.exitCode = 1;
+      return;
+    }
+    const entry = registry.find((t) => t.name === name);
+    if (!entry) {
+      console.error(`Template '${name}' not found.`);
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      const path = await cloneTemplate(name, entry.url);
+      entry.path = path;
+      await saveTemplateRegistry(registry);
+      console.log(`[template] Updated '${name}' from ${entry.url} (path: ${path})`);
+    } catch (err) {
+      console.error(
+        `[template] Failed to update template: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exitCode = 1;
+    }
     return;
   }
 

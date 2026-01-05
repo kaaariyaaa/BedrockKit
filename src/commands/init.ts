@@ -16,11 +16,11 @@ import {
   buildScriptDependenciesFromMap,
   generateManifest,
 } from "../manifest.js";
-import { knownTemplates } from "../templates.js";
+import { knownTemplates, loadTemplateRegistry, materializeTemplate } from "../templates.js";
 import type { CommandContext, ScriptApiSelection, ScriptApiVersionMap } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
-import { writeFile } from "node:fs/promises";
+import { writeFile, cp } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
 
@@ -315,6 +315,8 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     return;
   }
 
+  const registry = await loadTemplateRegistry();
+
   intro("Initializing workspace");
   const spin = spinner();
   spin.start("Generating manifests and config");
@@ -391,6 +393,26 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   };
 
   try {
+    // If a template repo is selected and available, copy its contents before generating files.
+    let templatePath: string | null = null;
+    if (template === "custom-git" && !templateArg && !nonInteractive) {
+      const gitUrl = await text({
+        message: "Enter Git URL for template",
+        validate: (v) => (!v.trim() ? "URL is required" : undefined),
+      });
+      if (isCancel(gitUrl)) {
+        outro("Cancelled.");
+        return;
+      }
+      templatePath = await materializeTemplate(String(gitUrl).trim(), registry, { allowUrl: true });
+    } else if (template) {
+      templatePath = await materializeTemplate(template, registry, { allowUrl: false });
+    }
+    if (templatePath) {
+      await ensureDir(targetDir);
+      await cp(templatePath, targetDir, { recursive: true, force: true });
+    }
+
     const bkitIgnore = [
       "# Build output",
       "dist/",
