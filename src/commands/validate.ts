@@ -15,13 +15,14 @@ async function readManifest(path: string): Promise<Manifest> {
 export async function handleValidate(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const strict = !!parsed.flags.strict;
+  const jsonOut = !!parsed.flags.json;
   const cwd = process.cwd();
   const issues: string[] = [];
 
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
   if (!configPath) {
     issues.push("Config selection cancelled.");
-    report(issues);
+    report(issues, { json: jsonOut, configPath: configPath ?? undefined });
     return;
   }
 
@@ -35,7 +36,7 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
   }
 
   if (!config) {
-    report(issues);
+    report(issues, { json: jsonOut, configPath });
     return;
   }
 
@@ -133,10 +134,28 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
       issues.push("Resource manifest missing description");
   }
 
-  report(issues);
+  report(issues, { json: jsonOut, configPath });
 }
 
-function report(issues: string[]): void {
+function report(
+  issues: string[],
+  opts: { json?: boolean; configPath?: string } = {},
+): void {
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: issues.length === 0,
+          issues,
+          configPath: opts.configPath,
+        },
+        null,
+        2,
+      ),
+    );
+    if (issues.length) process.exitCode = 1;
+    return;
+  }
   if (!issues.length) {
     console.log("Validation passed.");
     return;
