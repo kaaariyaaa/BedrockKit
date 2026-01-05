@@ -8,6 +8,7 @@ import {
   text,
   multiselect,
 } from "@clack/prompts";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import {
   DEFAULT_SCRIPT_API_VERSION,
@@ -34,7 +35,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   let includeScript = parsed.flags["no-script"] ? false : true;
   const scriptEntry = (parsed.flags["script-entry"] as string | undefined) ?? "scripts/main.ts";
   const scriptLanguage: "typescript" | "javascript" | undefined = includeScript
-    ? "typescript"
+    ? "javascript"
     : undefined;
   let scriptApiVersion =
     (parsed.flags["script-api-version"] as string | undefined) || DEFAULT_SCRIPT_API_VERSION;
@@ -44,6 +45,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     serverUi: true,
     common: false,
     math: false,
+    serverNet: false,
+    serverGametest: false,
+    serverAdmin: false,
+    debugUtilities: false,
+    vanillaData: false,
   };
   let skipInstall = !!parsed.flags["skip-install"];
   let installStatus: "skipped" | "completed" | "failed" = skipInstall
@@ -70,7 +76,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   const dirFlag =
     (parsed.flags.dir as string | undefined) ??
     (parsed.flags["target-dir"] as string | undefined);
-  const baseDir = resolve(cwd, "project", "addon");
+  const baseDir = resolve(cwd, "project");
   const nameForPath = projectName ?? "addon";
   const targetDir = dirFlag ? resolve(cwd, dirFlag) : resolve(baseDir, nameForPath);
   const targetName =
@@ -87,6 +93,35 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       return;
     }
     template = String(choice);
+  }
+
+  let packSelection = {
+    behavior: true,
+    resource: true,
+  };
+  if (!nonInteractive) {
+    const selectedPacks = await multiselect({
+      message: "Select packs to generate",
+      options: [
+        { value: "behavior", label: "Behavior Pack" },
+        { value: "resource", label: "Resource Pack" },
+      ],
+      initialValues: ["behavior", "resource"],
+    });
+    if (isCancel(selectedPacks)) {
+      outro("Cancelled.");
+      return;
+    }
+    const set = new Set(selectedPacks as string[]);
+    packSelection = {
+      behavior: set.has("behavior"),
+      resource: set.has("resource"),
+    };
+    if (!packSelection.behavior && !packSelection.resource) {
+      console.error("At least one pack must be selected.");
+      process.exitCode = 1;
+      return;
+    }
   }
 
   if (!nonInteractive && parsed.flags["no-script"] === undefined) {
@@ -108,9 +143,14 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
         { value: "server", label: "@minecraft/server", hint: "Core Script API" },
         { value: "serverUi", label: "@minecraft/server-ui", hint: "UI helpers" },
         { value: "common", label: "@minecraft/common", hint: "Shared utilities" },
-        { value: "math", label: "@minecraft/math", hint: "Math helpers" },
+        { value: "math", label: "@minecraft/math", hint: "Math helpers (bundled)" },
+        { value: "serverNet", label: "@minecraft/server-net", hint: "Net helpers (off by default)" },
+        { value: "serverGametest", label: "@minecraft/server-gametest", hint: "Gametest API (off by default)" },
+        { value: "serverAdmin", label: "@minecraft/server-admin", hint: "Admin API (off by default)" },
+        { value: "debugUtilities", label: "@minecraft/debug-utilities", hint: "Debug helpers (off by default)" },
+        { value: "vanillaData", label: "@minecraft/vanilla-data", hint: "Vanilla constants (npm only)" },
       ],
-      initialValues: ["server", "serverUi", "common", "math"],
+      initialValues: ["server", "serverUi"],
     });
     if (isCancel(pkgChoice)) {
       outro("Cancelled.");
@@ -122,6 +162,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       serverUi: selected.has("serverUi"),
       common: selected.has("common"),
       math: selected.has("math"),
+      serverNet: selected.has("serverNet"),
+      serverGametest: selected.has("serverGametest"),
+      serverAdmin: selected.has("serverAdmin"),
+      debugUtilities: selected.has("debugUtilities"),
+      vanillaData: selected.has("vanillaData"),
     };
     if (!selected.size) {
       includeScript = false;
@@ -215,6 +260,15 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     if (scriptApiSelection.serverUi) selectedPackages.push(["serverUi", "@minecraft/server-ui"]);
     if (scriptApiSelection.common) selectedPackages.push(["common", "@minecraft/common"]);
     if (scriptApiSelection.math) selectedPackages.push(["math", "@minecraft/math"]);
+    if (scriptApiSelection.serverNet) selectedPackages.push(["serverNet", "@minecraft/server-net"]);
+    if (scriptApiSelection.serverGametest)
+      selectedPackages.push(["serverGametest", "@minecraft/server-gametest"]);
+    if (scriptApiSelection.serverAdmin) selectedPackages.push(["serverAdmin", "@minecraft/server-admin"]);
+    if (scriptApiSelection.debugUtilities)
+      selectedPackages.push(["debugUtilities", "@minecraft/debug-utilities"]);
+    if (scriptApiSelection.vanillaData)
+      selectedPackages.push(["vanillaData", "@minecraft/vanilla-data"]);
+    // math not treated as Script API dependency
 
     for (const [key, pkg] of selectedPackages) {
       const picked = await pickVersion(pkg, scriptApiVersion);
@@ -265,32 +319,44 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   const spin = spinner();
   spin.start("Generating manifests and config");
 
-  const behaviorManifest = generateManifest({
-    type: "behavior",
-    name: targetName,
-    includeScriptModule: includeScript,
-    scriptEntry,
-    scriptLanguage,
-    scriptApiVersion,
-    scriptApiVersions,
-    scriptApiSelection,
-  });
-  const resourceManifest = generateManifest({
-    type: "resource",
-    name: targetName,
-  });
-  behaviorManifest.dependencies = [
-    ...(behaviorManifest.dependencies ?? []),
-    { uuid: resourceManifest.header.uuid, version: resourceManifest.header.version },
-  ];
-  resourceManifest.dependencies = [
-    { uuid: behaviorManifest.header.uuid, version: behaviorManifest.header.version },
-  ];
+  const manifestScriptEntry =
+    scriptEntry?.endsWith(".ts") && includeScript ? scriptEntry.replace(/\.ts$/, ".js") : scriptEntry;
+
+  const behaviorManifest = packSelection.behavior
+    ? generateManifest({
+        type: "behavior",
+        name: targetName,
+        includeScriptModule: includeScript,
+        scriptEntry: manifestScriptEntry,
+        scriptLanguage,
+        scriptApiVersion,
+        scriptApiVersions,
+        scriptApiSelection,
+      })
+    : undefined;
+
+  const resourceManifest = packSelection.resource
+    ? generateManifest({
+        type: "resource",
+        name: targetName,
+      })
+    : undefined;
+
+  if (behaviorManifest && resourceManifest) {
+    behaviorManifest.dependencies = [
+      ...(behaviorManifest.dependencies ?? []),
+      { uuid: resourceManifest.header.uuid, version: resourceManifest.header.version },
+    ];
+    resourceManifest.dependencies = [
+      { uuid: behaviorManifest.header.uuid, version: behaviorManifest.header.version },
+    ];
+  }
 
   const configPath = resolve(targetDir, "bkit.config.json");
   const config = {
     project: { name: targetName, version: "1.0.0" },
     template: template ?? "bkit-default",
+    packSelection,
     packs: {
       behavior: "packs/behavior",
       resource: "packs/resource",
@@ -311,30 +377,31 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
           language: scriptLanguage,
           dependencies:
             Object.keys(scriptApiVersions).length > 0
-              ? buildScriptDependenciesFromMap(scriptApiVersions, scriptApiVersion)
-              : buildScriptDependencies(scriptApiVersion),
+              ? buildScriptDependenciesFromMap(scriptApiVersions, scriptApiVersion, scriptApiSelection)
+              : buildScriptDependencies(scriptApiVersion, scriptApiSelection),
           apiVersion: scriptApiVersion,
         }
       : undefined,
   };
 
   try {
-    await writeJson(resolve(targetDir, "packs/behavior/manifest.json"), behaviorManifest);
-    await writeJson(resolve(targetDir, "packs/resource/manifest.json"), resourceManifest);
+    if (behaviorManifest) {
+      await writeJson(resolve(targetDir, "packs/behavior/manifest.json"), behaviorManifest);
+    }
+    if (resourceManifest) {
+      await writeJson(resolve(targetDir, "packs/resource/manifest.json"), resourceManifest);
+    }
     await writeJson(configPath, config);
     await ensureDir(resolve(targetDir, "dist"));
-    if (includeScript) {
+    if (includeScript && packSelection.behavior) {
       const scriptPath = resolve(targetDir, "packs/behavior", scriptEntry);
       const scriptDir = resolve(scriptPath, "..");
       await ensureDir(scriptDir);
-      const defaultScript =
-        scriptLanguage === "typescript"
-          ? `import { world, system } from "@minecraft/server";\nlet init = false;\n\nsystem.runInterval(() => {\n  if (!init) {\n    world.sendMessage(\`["${targetName}"] Initialized\`);\n    init = true;\n  }\n});\n`
-          : `import { world, system } from "@minecraft/server";\nlet init = false;\n\nsystem.runInterval(() => {\n  if (!init) {\n    world.sendMessage(\`["${targetName}"] Initialized\`);\n    init = true;\n  }\n});\n`;
+      const defaultScript = `import { world, system } from "@minecraft/server";\nconst addonName = "${targetName}";\nlet init = false;\n\nsystem.runInterval(() => {\n  if (!init) {\n    world.sendMessage(\`[\${addonName}] Initialized\`);\n    init = true;\n  }\n});\n`;
       await writeFile(scriptPath, defaultScript, { encoding: "utf8" });
       await writeJson(
         resolve(targetDir, "package.json"),
-        buildPackageJson(targetName, scriptApiVersion, scriptApiVersions),
+        buildPackageJson(targetName, scriptApiVersion, scriptApiVersions, scriptApiSelection),
       );
       await writeJson(resolve(targetDir, "tsconfig.json"), buildTsConfig(scriptEntry));
     }
@@ -368,7 +435,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       `- resource pack manifest: packs/resource/manifest.json`,
       `- config: bkit.config.json`,
       includeScript
-        ? `- script entry: ${scriptEntry} (language: ${scriptLanguage}, api: ${scriptApiVersion}, dependencies: ${buildScriptDependencies(scriptApiVersion)
+        ? `- script entry: ${scriptEntry} (language: ${scriptLanguage}, api: ${scriptApiVersion}, dependencies: ${buildScriptDependencies(scriptApiVersion, scriptApiSelection)
             .map((d) => d.module_name)
             .join(", ")})`
         : "",
@@ -389,6 +456,7 @@ function buildPackageJson(
   name: string,
   scriptApiVersion: string,
   scriptApiVersions: ScriptApiVersionMap,
+  selection: ScriptApiSelection,
 ) {
   return {
     name,
@@ -397,10 +465,27 @@ function buildPackageJson(
     type: "module",
     description: "BedrockKit addon project",
     dependencies: {
-      "@minecraft/server": scriptApiVersions.server ?? scriptApiVersion,
-      "@minecraft/server-ui": scriptApiVersions.serverUi ?? scriptApiVersion,
-      "@minecraft/common": scriptApiVersions.common ?? scriptApiVersion,
-      "@minecraft/math": scriptApiVersions.math ?? scriptApiVersion,
+      "@minecraft/server": selection.server ? scriptApiVersions.server ?? scriptApiVersion : undefined,
+      "@minecraft/server-ui": selection.serverUi
+        ? scriptApiVersions.serverUi ?? scriptApiVersion
+        : undefined,
+      "@minecraft/common": selection.common ? scriptApiVersions.common ?? scriptApiVersion : undefined,
+      "@minecraft/math": selection.math ? scriptApiVersions.math ?? scriptApiVersion : undefined,
+      "@minecraft/server-net": selection.serverNet
+        ? scriptApiVersions.serverNet ?? scriptApiVersion
+        : undefined,
+      "@minecraft/server-gametest": selection.serverGametest
+        ? scriptApiVersions.serverGametest ?? scriptApiVersion
+        : undefined,
+      "@minecraft/server-admin": selection.serverAdmin
+        ? scriptApiVersions.serverAdmin ?? scriptApiVersion
+        : undefined,
+      "@minecraft/debug-utilities": selection.debugUtilities
+        ? scriptApiVersions.debugUtilities ?? scriptApiVersion
+        : undefined,
+      "@minecraft/vanilla-data": selection.vanillaData
+        ? scriptApiVersions.vanillaData ?? scriptApiVersion
+        : undefined,
     },
     devDependencies: {
       typescript: "^5.3.3",

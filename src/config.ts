@@ -17,8 +17,10 @@ export function validateConfig(config: BkitConfig): string[] {
   const issues: string[] = [];
   if (!config.project?.name) issues.push("config.project.name is missing");
   if (!config.project?.version) issues.push("config.project.version is missing");
-  if (!config.packs?.behavior) issues.push("config.packs.behavior is missing");
-  if (!config.packs?.resource) issues.push("config.packs.resource is missing");
+  if (config.packSelection?.behavior !== false && !config.packs?.behavior)
+    issues.push("config.packs.behavior is missing");
+  if (config.packSelection?.resource !== false && !config.packs?.resource)
+    issues.push("config.packs.resource is missing");
   if (!config.build?.outDir) issues.push("config.build.outDir is missing");
   if (!config.sync?.defaultTarget)
     issues.push("config.sync.defaultTarget is missing");

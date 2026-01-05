@@ -25,6 +25,11 @@ export type ScriptApiVersionMap = {
   serverUi?: string;
   common?: string;
   math?: string;
+  serverNet?: string;
+  serverGametest?: string;
+  serverAdmin?: string;
+  debugUtilities?: string;
+  vanillaData?: string;
 };
 
 export type ScriptApiSelection = {
@@ -32,11 +37,20 @@ export type ScriptApiSelection = {
   serverUi?: boolean;
   common?: boolean;
   math?: boolean;
+  serverNet?: boolean;
+  serverGametest?: boolean;
+  serverAdmin?: boolean;
+  debugUtilities?: boolean;
+  vanillaData?: boolean;
 };
 
 export type BkitConfig = {
   project: { name: string; version: string };
   template: string;
+  packSelection?: {
+    behavior?: boolean;
+    resource?: boolean;
+  };
   paths?: {
     root?: string;
   };

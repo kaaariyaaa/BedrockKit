@@ -30,6 +30,9 @@ export type Manifest = {
   };
   modules: ManifestModule[];
   dependencies?: ManifestDependency[];
+  metadata?: {
+    product_type?: string;
+  };
 };
 
 export type GenerateManifestOptions = {
@@ -52,6 +55,11 @@ export type ScriptApiVersionMap = {
   serverUi?: string;
   common?: string;
   math?: string;
+  serverNet?: string;
+  serverGametest?: string;
+  serverAdmin?: string;
+  debugUtilities?: string;
+  vanillaData?: string;
 };
 
 export type ScriptApiVersionSelection = {
@@ -59,19 +67,46 @@ export type ScriptApiVersionSelection = {
   serverUi?: boolean;
   common?: boolean;
   math?: boolean;
+  serverNet?: boolean;
+  serverGametest?: boolean;
+  serverAdmin?: boolean;
+  debugUtilities?: boolean;
+  vanillaData?: boolean;
 };
 
 export const DEFAULT_SCRIPT_API_VERSION = "1.11.0";
 
 export function buildScriptDependencies(
   version: string = DEFAULT_SCRIPT_API_VERSION,
+  selection: ScriptApiVersionSelection = {
+    server: true,
+    serverUi: true,
+    common: false,
+    math: false,
+    serverNet: false,
+    serverGametest: false,
+    serverAdmin: false,
+    debugUtilities: false,
+    vanillaData: false,
+  },
 ): ManifestScriptDependency[] {
   return [
-    { module_name: "@minecraft/server", version },
-    { module_name: "@minecraft/server-ui", version },
-    { module_name: "@minecraft/common", version },
-    { module_name: "@minecraft/math", version },
-  ];
+    ...(selection.server !== false ? [{ module_name: "@minecraft/server", version }] : []),
+    ...(selection.serverUi !== false ? [{ module_name: "@minecraft/server-ui", version }] : []),
+    ...(selection.common !== false ? [{ module_name: "@minecraft/common", version }] : []),
+    ...(selection.math !== false ? [{ module_name: "@minecraft/math", version }] : []),
+    ...(selection.serverNet !== false ? [{ module_name: "@minecraft/server-net", version }] : []),
+    ...(selection.serverGametest !== false
+      ? [{ module_name: "@minecraft/server-gametest", version }]
+      : []),
+    ...(selection.serverAdmin !== false ? [{ module_name: "@minecraft/server-admin", version }] : []),
+    ...(selection.debugUtilities !== false
+      ? [{ module_name: "@minecraft/debug-utilities", version }]
+      : []),
+    ...(selection.vanillaData !== false
+      ? [{ module_name: "@minecraft/vanilla-data", version }]
+      : []),
+  ].filter(Boolean) as ManifestScriptDependency[];
 }
 
 export function buildScriptDependenciesFromMap(
@@ -82,6 +117,11 @@ export function buildScriptDependenciesFromMap(
     serverUi: true,
     common: false,
     math: false,
+    serverNet: false,
+    serverGametest: false,
+    serverAdmin: false,
+    debugUtilities: false,
+    vanillaData: false,
   },
 ): ManifestScriptDependency[] {
   const deps: ManifestScriptDependency[] = [];
@@ -97,6 +137,33 @@ export function buildScriptDependenciesFromMap(
   if (selection.math !== false) {
     deps.push({ module_name: "@minecraft/math", version: versions.math ?? fallback });
   }
+  if (selection.serverNet !== false) {
+    deps.push({ module_name: "@minecraft/server-net", version: versions.serverNet ?? fallback });
+  }
+  if (selection.serverGametest !== false) {
+    deps.push({
+      module_name: "@minecraft/server-gametest",
+      version: versions.serverGametest ?? fallback,
+    });
+  }
+  if (selection.serverAdmin !== false) {
+    deps.push({
+      module_name: "@minecraft/server-admin",
+      version: versions.serverAdmin ?? fallback,
+    });
+  }
+  if (selection.debugUtilities !== false) {
+    deps.push({
+      module_name: "@minecraft/debug-utilities",
+      version: versions.debugUtilities ?? fallback,
+    });
+  }
+  if (selection.vanillaData !== false) {
+    deps.push({
+      module_name: "@minecraft/vanilla-data",
+      version: versions.vanillaData ?? fallback,
+    });
+  }
   return deps;
 }
 
@@ -104,7 +171,7 @@ export const defaultScriptDependencies = buildScriptDependencies();
 
 export function generateManifest(opts: GenerateManifestOptions): Manifest {
   const version = opts.version ?? [1, 0, 0];
-  const minEngine = opts.minEngine ?? [1, 20, 0];
+  const minEngine = opts.minEngine ?? [1, 21, 2];
 
   const packUuid = randomUUID();
   const moduleUuid = randomUUID();
@@ -133,8 +200,20 @@ export function generateManifest(opts: GenerateManifestOptions): Manifest {
             opts.scriptApiVersion ?? DEFAULT_SCRIPT_API_VERSION,
             opts.scriptApiSelection,
           )
-        : buildScriptDependencies(opts.scriptApiVersion ?? DEFAULT_SCRIPT_API_VERSION));
-    dependencies.push(...scriptDeps);
+        : buildScriptDependencies(
+            opts.scriptApiVersion ?? DEFAULT_SCRIPT_API_VERSION,
+            opts.scriptApiSelection,
+          ));
+    // Exclude math/vanilla-data from manifest dependencies; they are bundled/imported directly.
+    dependencies.push(
+      ...scriptDeps.filter(
+        (dep) =>
+          !(
+            "module_name" in dep &&
+            (dep.module_name === "@minecraft/math" || dep.module_name === "@minecraft/vanilla-data")
+          ),
+      ),
+    );
   }
 
   return {
@@ -148,5 +227,8 @@ export function generateManifest(opts: GenerateManifestOptions): Manifest {
     },
     modules,
     dependencies: dependencies.length ? dependencies : undefined,
+    metadata: {
+      product_type: "addon",
+    },
   };
 }

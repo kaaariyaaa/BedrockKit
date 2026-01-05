@@ -3,6 +3,8 @@ import { handleTemplate } from "./template.js";
 import { handleValidate } from "./validate.js";
 import { handleConfig } from "./config.js";
 import { handleBump } from "./bump.js";
+import { handlePackage } from "./package.js";
+import { handleBuild } from "./build.js";
 import type { Command } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
@@ -34,20 +36,12 @@ export function buildCommands(onHelp: () => void): Command[] {
     {
       name: "build",
       description: "Build/compile packs using @minecraft/core-build-tasks",
-      run: async (ctx) => {
-        const parsed = parseArgs(ctx.argv);
-        const target = parsed.flags.target ?? "dev";
-        console.log(`[build] Building target '${target}' (stub)`);
-      },
+      run: handleBuild,
     },
     {
       name: "package",
       description: "Package build artifacts into distributable archives (zip)",
-      run: async (ctx) => {
-        const parsed = parseArgs(ctx.argv);
-        const out = parsed.flags.out ?? "dist/";
-        console.log(`[package] Would zip build artifacts to ${out}`);
-      },
+      run: handlePackage,
     },
     {
       name: "sync",

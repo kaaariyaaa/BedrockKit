@@ -43,12 +43,21 @@ export async function fetchNpmVersionChannels(
     preview: [],
     other: [],
   };
+  const seenBase = new Set<string>();
   try {
     const res = await fetch(url);
     if (!res.ok) return result;
     const data = (await res.json()) as { versions?: Record<string, unknown> };
     const versions = Object.keys(data.versions ?? {}).sort(compareSemverDesc);
     for (const v of versions) {
+      // Drop build-number style variants (e.g., 1.0.0-beta.00001b26) entirely.
+      if (/[.-]\d+b\d+/i.test(v)) {
+        continue;
+      }
+      // Ignore build numbers like ".00001b37" by collapsing to a base key.
+      const base = v.replace(/([0-9]+(?:\.[0-9]+){2}(?:-[^.]+)?)(?:\..*)$/, "$1");
+      if (seenBase.has(base)) continue;
+      seenBase.add(base);
       const channel = classifyVersion(v);
       if (result[channel].length < limit) {
         result[channel].push(v);
