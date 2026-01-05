@@ -24,6 +24,32 @@ export function validateConfig(config: BkitConfig): string[] {
   if (!config.build?.outDir) issues.push("config.build.outDir is missing");
   if (!config.sync?.defaultTarget)
     issues.push("config.sync.defaultTarget is missing");
+  if (config.sync?.targets && !(config.sync.defaultTarget in config.sync.targets)) {
+    issues.push("config.sync.defaultTarget is not defined in sync.targets");
+  }
+  if (config.sync?.targets) {
+    for (const [name, target] of Object.entries(config.sync.targets)) {
+      if (target.product) {
+        // product-based deploy; no path required
+        if (
+          target.product !== "BedrockUWP" &&
+          target.product !== "PreviewUWP" &&
+          target.product !== "BedrockGDK" &&
+          target.product !== "PreviewGDK"
+        ) {
+          issues.push(`sync.targets['${name}'].product is invalid`);
+        }
+      } else {
+        // path-based deploy
+        if (config.packSelection?.behavior !== false && !target.behavior) {
+          issues.push(`sync.targets['${name}'].behavior is missing`);
+        }
+        if (config.packSelection?.resource !== false && !target.resource) {
+          issues.push(`sync.targets['${name}'].resource is missing`);
+        }
+      }
+    }
+  }
   if (config.paths && typeof config.paths !== "object")
     issues.push("config.paths must be an object if present");
 

@@ -21,6 +21,9 @@ export async function handleConfig(ctx: CommandContext): Promise<void> {
   console.log(`- packs.resource: ${config.packs.resource}`);
   console.log(`- build.outDir: ${config.build.outDir} (target: ${config.build.target})`);
   console.log(`- sync.defaultTarget: ${config.sync.defaultTarget}`);
+  if (config.sync.targets) {
+    console.log(`- sync.targets: ${Object.keys(config.sync.targets).join(", ") || "(none)"}`);
+  }
   if (config.script) {
     console.log(
       `- script: entry=${config.script.entry}, language=${config.script.language}, deps=${config.script.dependencies

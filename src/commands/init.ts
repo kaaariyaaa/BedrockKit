@@ -366,7 +366,13 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       target: "dev",
     },
     sync: {
-      defaultTarget: "dev",
+      defaultTarget: "gdk",
+      targets: {
+        gdk: {
+          product: "BedrockGDK",
+          projectName: targetName,
+        },
+      },
     },
     paths: {
       root: targetDir,

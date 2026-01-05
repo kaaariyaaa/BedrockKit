@@ -1,0 +1,139 @@
+import { cp, rm } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { select, isCancel } from "@clack/prompts";
+import { loadConfig } from "../config.js";
+import type { CommandContext } from "../types.js";
+import { parseArgs } from "../utils/args.js";
+import { ensureDir, pathExists } from "../utils/fs.js";
+import { resolveConfigPath } from "../utils/config-discovery.js";
+import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
+
+export async function handleSync(ctx: CommandContext): Promise<void> {
+  const parsed = parseArgs(ctx.argv);
+  const dryRun = !!parsed.flags["dry-run"];
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  if (!configPath) {
+    console.error("Config selection cancelled.");
+    process.exitCode = 1;
+    return;
+  }
+  const config = await loadConfig(configPath);
+  const configDir = dirname(configPath);
+  const rootDir = config.paths?.root ? resolve(configDir, config.paths.root) : configDir;
+  const buildDir = resolve(rootDir, config.build?.outDir ?? "dist");
+  const behaviorEnabled = config.packSelection?.behavior !== false;
+  const resourceEnabled = config.packSelection?.resource !== false;
+  const behaviorSrc = behaviorEnabled ? resolve(buildDir, config.packs.behavior) : null;
+  const resourceSrc = resourceEnabled ? resolve(buildDir, config.packs.resource) : null;
+
+  if (!(await pathExists(buildDir))) {
+    console.error(`Build output not found: ${buildDir}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (behaviorEnabled && behaviorSrc && !(await pathExists(behaviorSrc))) {
+    console.error(`Behavior build output not found: ${behaviorSrc}. Run 'bkit build' first.`);
+    process.exitCode = 1;
+    return;
+  }
+  if (resourceEnabled && resourceSrc && !(await pathExists(resourceSrc))) {
+    console.error(`Resource build output not found: ${resourceSrc}. Run 'bkit build' first.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const targets = config.sync?.targets ?? {};
+  const targetNames = Object.keys(targets);
+  if (!targetNames.length) {
+    console.error(
+      "No sync targets defined in config.sync.targets. Add entries like { dev: { behavior: \"/path/to/development_behavior_packs/<name>\", resource: \"/path/to/development_resource_packs/<name>\" } }",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  let targetName = parsed.flags.target as string | undefined;
+  if (!targetName) {
+    targetName = config.sync.defaultTarget;
+  }
+  if (!targetName || !(targetName in targets)) {
+    const choice = await select({
+      message: "Select sync target",
+      options: targetNames.map((t) => ({ value: t, label: t })),
+    });
+    if (isCancel(choice)) {
+      console.error("Sync cancelled.");
+      process.exitCode = 1;
+      return;
+    }
+    targetName = String(choice);
+  }
+
+  const targetConfig = targets[targetName!];
+
+  // If product is specified, use core-build-tasks copyTask (MCBEAddonTemplate style).
+  if (targetConfig.product) {
+    const projectName = targetConfig.projectName ?? config.project.name;
+    if (dryRun) {
+      console.log(
+        `[dry-run] Would deploy via core-build-tasks to ${targetConfig.product} as ${projectName}`,
+      );
+      return;
+    }
+    process.env.PROJECT_NAME = projectName;
+    process.env.MINECRAFT_PRODUCT = targetConfig.product;
+    const coreBuild = await import("@minecraft/core-build-tasks");
+    const copyTask = (coreBuild as any).copyTask as
+      | ((params: CopyTaskParameters) => () => void)
+      | undefined;
+    if (!copyTask) {
+      console.error("copyTask not found in @minecraft/core-build-tasks");
+      process.exitCode = 1;
+      return;
+    }
+    const params: CopyTaskParameters = {
+      copyToBehaviorPacks: behaviorEnabled && behaviorSrc ? [behaviorSrc] : [],
+      copyToScripts: [],
+      copyToResourcePacks: resourceEnabled && resourceSrc ? [resourceSrc] : [],
+    };
+    try {
+      await Promise.resolve(copyTask(params)());
+      console.log(
+        `Synced via core-build-tasks to ${targetConfig.product} (project: ${projectName})`,
+      );
+    } catch (err) {
+      console.error(
+        `Sync failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  // Path-based sync (previous behavior)
+  if (behaviorEnabled && !targetConfig?.behavior) {
+    console.error(`Target '${targetName}' missing behavior path in sync.targets`);
+    process.exitCode = 1;
+    return;
+  }
+  if (resourceEnabled && !targetConfig?.resource) {
+    console.error(`Target '${targetName}' missing resource path in sync.targets`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks: { from: string; to: string }[] = [];
+  if (behaviorEnabled && behaviorSrc) tasks.push({ from: behaviorSrc, to: targetConfig.behavior! });
+  if (resourceEnabled && resourceSrc) tasks.push({ from: resourceSrc, to: targetConfig.resource! });
+
+  for (const { from, to } of tasks) {
+    if (dryRun) {
+      console.log(`[dry-run] Would sync ${from} -> ${to}`);
+      continue;
+    }
+    await ensureDir(dirname(to));
+    await rm(to, { recursive: true, force: true });
+    await cp(from, to, { recursive: true, force: true });
+    console.log(`Synced ${from} -> ${to}`);
+  }
+}

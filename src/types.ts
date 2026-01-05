@@ -64,6 +64,24 @@ export type BkitConfig = {
   };
   sync: {
     defaultTarget: string;
+    targets?: Record<
+      string,
+      {
+        /**
+         * If provided, uses @minecraft/core-build-tasks copyTask to deploy to the
+         * game's development folders for the given product (e.g. BedrockUWP).
+         * Falls back to manual copy when not set.
+         */
+        product?: "BedrockUWP" | "PreviewUWP" | "BedrockGDK" | "PreviewGDK";
+        /**
+         * Destination project folder name in development_packs.
+         * Defaults to config.project.name when omitted.
+         */
+        projectName?: string;
+        behavior?: string;
+        resource?: string;
+      }
+    >;
   };
   script?: {
     entry: string;

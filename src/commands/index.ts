@@ -6,6 +6,7 @@ import { handleBump } from "./bump.js";
 import { handlePackage } from "./package.js";
 import { handleBuild } from "./build.js";
 import { handleDeps } from "./deps.js";
+import { handleSync } from "./sync.js";
 import type { Command } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
@@ -52,14 +53,7 @@ export function buildCommands(onHelp: () => void): Command[] {
     {
       name: "sync",
       description: "Sync build outputs to local Minecraft developer folders",
-      run: async (ctx) => {
-        const parsed = parseArgs(ctx.argv);
-        const target = parsed.flags.target ?? "dev";
-        const dry = !!parsed.flags["dry-run"];
-        console.log(
-          `[sync] Would copy build output to '${target}'${dry ? " (dry-run)" : ""}`,
-        );
-      },
+      run: handleSync,
     },
     {
       name: "config",
