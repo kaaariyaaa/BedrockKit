@@ -5,6 +5,7 @@ import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
+import { loadIgnoreRules, isIgnored } from "../utils/ignore.js";
 
 function shouldSkipTsScript(entryRel: string, scriptEntry: string | undefined, src: string, root: string): boolean {
   if (!scriptEntry) return false;
@@ -32,6 +33,7 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
   const rootDir = config.paths?.root
     ? resolve(configDir, config.paths.root)
     : configDir;
+  const ignoreRules = await loadIgnoreRules(rootDir);
 
   const outDir = resolve(rootDir, config.build?.outDir ?? "dist");
   const behaviorEnabled = config.packSelection?.behavior !== false;
@@ -77,6 +79,7 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
       recursive: true,
       force: true,
       filter: (src) =>
+        !isIgnored(src, rootDir, ignoreRules) &&
         !shouldSkipTsScript(
           scriptEntryRel ? dirname(scriptEntryRel).replace(/\\/g, "/") : "",
           scriptEntryRel,
@@ -89,7 +92,11 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
   // Copy resource pack as-is.
   if (resourceEnabled && resourceSrc && resourceDest) {
     await ensureDir(dirname(resourceDest));
-    await cp(resourceSrc, resourceDest, { recursive: true, force: true });
+    await cp(resourceSrc, resourceDest, {
+      recursive: true,
+      force: true,
+      filter: (src) => !isIgnored(src, rootDir, ignoreRules),
+    });
   }
 
   // Optionally ensure outDir exists if packs missing.

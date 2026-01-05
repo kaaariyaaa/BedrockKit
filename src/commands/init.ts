@@ -391,6 +391,26 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   };
 
   try {
+    const bkitIgnore = [
+      "# Build output",
+      "dist/",
+      "",
+      "# Dependencies",
+      "node_modules/",
+      "",
+      "# VCS / editor",
+      ".git/",
+      ".vscode/",
+      ".idea/",
+      ".DS_Store",
+      "Thumbs.db",
+      "",
+      "# Logs / temp",
+      "*.log",
+      "*.tmp",
+    ]
+      .filter(Boolean)
+      .join("\n");
     if (behaviorManifest) {
       await writeJson(resolve(targetDir, "packs/behavior/manifest.json"), behaviorManifest);
     }
@@ -398,6 +418,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       await writeJson(resolve(targetDir, "packs/resource/manifest.json"), resourceManifest);
     }
     await writeJson(configPath, config);
+    await writeFile(resolve(targetDir, ".bkitignore"), `${bkitIgnore}\n`, { encoding: "utf8" });
     await ensureDir(resolve(targetDir, "dist"));
     if (includeScript && packSelection.behavior) {
       const scriptPath = resolve(targetDir, "packs/behavior", scriptEntry);
