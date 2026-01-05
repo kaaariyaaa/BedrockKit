@@ -8,6 +8,7 @@ import { handleBuild } from "./build.js";
 import { handleDeps } from "./deps.js";
 import { handleSync } from "./sync.js";
 import { handleImport } from "./import.js";
+import { handleWatch } from "./watch.js";
 import type { Command } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 
@@ -60,6 +61,11 @@ export function buildCommands(onHelp: () => void): Command[] {
       name: "sync",
       description: "Sync build outputs to local Minecraft developer folders",
       run: handleSync,
+    },
+    {
+      name: "watch",
+      description: "Watch projects, auto build (watch outDir) and sync on change",
+      run: handleWatch,
     },
     {
       name: "config",

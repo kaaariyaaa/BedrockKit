@@ -15,6 +15,10 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
   const log = jsonOut || quiet ? (_msg?: unknown) => {} : console.log;
+  const buildDirOverride =
+    (typeof parsed.flags["build-dir"] === "string" && parsed.flags["build-dir"]) ||
+    (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
+    undefined;
   let shouldBuild = parsed.flags.build !== false; // default true
   if (parsed.flags.build === undefined && !dryRun && !jsonOut && !quiet) {
     const buildChoice = await confirm({
@@ -37,7 +41,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const config = await loadConfig(configPath);
   const configDir = dirname(configPath);
   const rootDir = config.paths?.root ? resolve(configDir, config.paths.root) : configDir;
-  const buildDir = resolve(rootDir, config.build?.outDir ?? "dist");
+  const buildDir = resolve(rootDir, buildDirOverride ?? config.build?.outDir ?? "dist");
   const behaviorEnabled = config.packSelection?.behavior !== false;
   const resourceEnabled = config.packSelection?.resource !== false;
   const behaviorSrc = behaviorEnabled ? resolve(buildDir, config.packs.behavior) : null;
@@ -48,6 +52,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     const forward: string[] = [];
     if (jsonOut) forward.push("--json");
     if (quiet) forward.push("--quiet");
+    if (buildDirOverride) forward.push("--out-dir", buildDirOverride);
     await handleBuild({ ...ctx, argv: forward });
   }
 

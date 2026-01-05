@@ -18,6 +18,10 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
   const log = jsonOut || quiet ? (_msg?: unknown) => {} : console.log;
+  const outDirOverride =
+    (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
+    (typeof parsed.flags.outdir === "string" && parsed.flags.outdir) ||
+    undefined;
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
   if (!configPath) {
     console.error("Config selection cancelled.");
@@ -38,7 +42,7 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
     : configDir;
   const ignoreRules = await loadIgnoreRules(rootDir);
 
-  const outDir = resolve(rootDir, config.build?.outDir ?? "dist");
+  const outDir = resolve(rootDir, outDirOverride ?? config.build?.outDir ?? "dist");
   const behaviorEnabled = config.packSelection?.behavior !== false;
   const resourceEnabled = config.packSelection?.resource !== false;
   const behaviorSrc = behaviorEnabled ? resolve(rootDir, config.packs.behavior) : null;

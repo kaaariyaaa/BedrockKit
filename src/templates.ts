@@ -26,7 +26,7 @@ export async function loadTemplateRegistry(): Promise<TemplateEntry[]> {
   if (!(await pathExists(templateRegistryPath))) {
     return knownTemplates.map((t) => ({
       name: t.value,
-      url: t.hint ?? "",
+      url: "",
     }));
   }
   const raw = await readFile(templateRegistryPath, { encoding: "utf8" });
@@ -93,7 +93,12 @@ export async function materializeTemplate(
   opts: { allowUrl?: boolean },
 ): Promise<string | null> {
   const entry = registry.find((t) => t.name === nameOrUrl);
+  const isLikelyGit = (u?: string) =>
+    !!u && /^(https?:\/\/|git@|ssh:\/\/|file:\/\/|\.{0,2}\/)/i.test(u.trim());
   if (entry) {
+    if (!isLikelyGit(entry.url)) {
+      return null;
+    }
     if (entry.path && (await pathExists(entry.path))) return entry.path;
     const cloned = await cloneTemplate(entry.name, entry.url);
     entry.path = cloned;
@@ -101,6 +106,7 @@ export async function materializeTemplate(
     return cloned;
   }
   if (opts.allowUrl) {
+    if (!isLikelyGit(nameOrUrl)) return null;
     const tmpName = `tmp-${randomUUID()}`;
     return cloneTemplate(tmpName, nameOrUrl, {
       targetDir: resolve(process.cwd(), ".bkit", "tmp", tmpName),
