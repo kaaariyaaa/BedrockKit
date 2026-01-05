@@ -10,7 +10,8 @@ function patternToRegex(pattern: string): RegExp | null {
   // Basic glob-like to regex: * => .* (greedy), leading slash anchors to start.
   const escaped = trimmed
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*");
+    .replace(/\*\*/g, ".*") // ** for deep
+    .replace(/\*/g, "[^/]*");
   const anchored = trimmed.startsWith("/") ? `^${escaped.slice(1)}$` : `^.*${escaped}$`;
   return new RegExp(anchored);
 }
