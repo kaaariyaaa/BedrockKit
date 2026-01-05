@@ -1,10 +1,11 @@
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import type { Manifest } from "../manifest.js";
 import { loadConfig, validateConfig } from "../config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
 import { readFile } from "node:fs/promises";
+import { resolveConfigPath } from "../utils/config-discovery.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -17,9 +18,11 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
   const cwd = process.cwd();
   const issues: string[] = [];
 
-  let configPath = resolve(cwd, "bkit.config.json");
-  if (typeof parsed.flags.config === "string") {
-    configPath = resolve(cwd, parsed.flags.config);
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  if (!configPath) {
+    issues.push("Config selection cancelled.");
+    report(issues);
+    return;
   }
 
   let config;
@@ -38,8 +41,10 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
 
   issues.push(...validateConfig(config));
 
-  const behaviorManifestPath = resolve(cwd, config.packs.behavior, "manifest.json");
-  const resourceManifestPath = resolve(cwd, config.packs.resource, "manifest.json");
+  const configDir = dirname(configPath);
+  const rootDir = config.paths?.root ? resolve(configDir, config.paths.root) : configDir;
+  const behaviorManifestPath = resolve(rootDir, config.packs.behavior, "manifest.json");
+  const resourceManifestPath = resolve(rootDir, config.packs.resource, "manifest.json");
 
   const behaviorExists = await pathExists(behaviorManifestPath);
   const resourceExists = await pathExists(resourceManifestPath);
@@ -95,9 +100,16 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
         (d): d is { module_name: string; version: string } =>
           "module_name" in d && typeof d.module_name === "string",
       );
-      const missingDeps = config.script.dependencies.filter(
-        (dep) => !manifestScriptDeps.some((m) => m.module_name === dep.module_name),
-      );
+      const missingDeps = config.script.dependencies.filter((dep) => {
+        // math / vanilla-data are bundled/imported, not listed as manifest deps.
+        if (
+          dep.module_name === "@minecraft/math" ||
+          dep.module_name === "@minecraft/vanilla-data"
+        ) {
+          return false;
+        }
+        return !manifestScriptDeps.some((m) => m.module_name === dep.module_name);
+      });
       if (missingDeps.length) {
         issues.push(
           `Behavior manifest missing script dependencies: ${missingDeps

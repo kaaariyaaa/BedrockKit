@@ -11,6 +11,7 @@ import {
   bumpVersionString,
   stringToVersionTuple,
 } from "../utils/version.js";
+import { resolveConfigPath } from "../utils/config-discovery.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -36,11 +37,12 @@ export async function handleBump(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const level = (parsed.positional[0] as BumpLevel | undefined) ?? "patch";
 
-  const cwd = process.cwd();
-  const configPath =
-    typeof parsed.flags.config === "string"
-      ? resolve(cwd, parsed.flags.config)
-      : resolve(cwd, "bkit.config.json");
+  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined);
+  if (!configPath) {
+    console.error("Config selection cancelled.");
+    process.exitCode = 1;
+    return;
+  }
 
   if (!(await pathExists(configPath))) {
     console.error(`Config not found: ${configPath}`);
