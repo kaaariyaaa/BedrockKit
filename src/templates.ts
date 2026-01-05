@@ -6,7 +6,6 @@ import { spawn } from "node:child_process";
 
 export const knownTemplates = [
   { value: "official-sample", label: "Official sample", hint: "Mojang sample packs" },
-  { value: "bkit-default", label: "BedrockKit default", hint: "Built-in starter template" },
   { value: "custom-git", label: "Custom Git URL", hint: "Provide your own repository" },
 ];
 
