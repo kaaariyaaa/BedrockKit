@@ -20,3 +20,8 @@ pnpm-debug.log*
 # OS metadata
 .DS_Store
 Thumbs.db
+
+AGENTS.md
+project
+sample
+*.bkit
