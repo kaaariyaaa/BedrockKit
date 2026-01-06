@@ -19,7 +19,6 @@ export function printHelp(commands: Command[]): void {
     `  ${pc.yellow("-h, --help")}          Show help`,
     `  ${pc.yellow("-v, --version")}       Show version`,
     `  ${pc.yellow("-i, --interactive")}   Launch arrow-key menu`,
-    `  ${pc.yellow("--config <path>")}     Use config file (json/ts/mjs/js)`,
     `  ${pc.yellow("--json")}              Machine-readable output (build/package/sync/validate)`,
     `  ${pc.yellow("-q, --quiet")}         Suppress non-error logs (build/package/sync/validate)`,
     `  ${pc.yellow("--build=false")}       Skip pre-build for sync/package (default: true)`,

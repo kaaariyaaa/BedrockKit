@@ -5,6 +5,7 @@ import { isCancel, select } from "@clack/prompts";
 import { resolveLang, t } from "../utils/i18n.js";
 import type { BkitConfig, Lang } from "../types.js";
 import { pathExists } from "../utils/fs.js";
+import { loadSettings, resolveProjectRoot } from "../utils/settings.js";
 
 export const defaultConfigPath = resolve(process.cwd(), "bkit.config.json");
 
@@ -138,7 +139,8 @@ export function resolveOutDir(ctx: ConfigContext, override?: string): string {
 }
 
 async function discoverAddonConfigs(cwd: string): Promise<string[]> {
-  const base = resolve(cwd, "project");
+  const settings = await loadSettings();
+  const base = resolveProjectRoot(settings);
   if (!(await pathExists(base))) return [];
   const entries = await readdir(base, { withFileTypes: true });
   const configs: string[] = [];

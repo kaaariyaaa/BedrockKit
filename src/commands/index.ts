@@ -1,7 +1,6 @@
 import { handleInit } from "./init.js";
 import { handleTemplate } from "./template.js";
 import { handleValidate } from "./validate.js";
-import { handleConfig } from "./config.js";
 import { handleBump } from "./bump.js";
 import { handlePackage } from "./package.js";
 import { handleBuild } from "./build.js";
@@ -67,11 +66,6 @@ export function buildCommands(lang: Lang, onHelp: () => void): Command[] {
       name: "watch",
       description: t("command.watch.desc", lang),
       run: handleWatch,
-    },
-    {
-      name: "config",
-      description: t("command.config.desc", lang),
-      run: handleConfig,
     },
     {
       name: "setting",

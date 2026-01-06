@@ -233,10 +233,6 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "複数プロジェクトを監視し、変更ごとに自動ビルド＋同期",
     en: "Watch projects, auto build (watch outDir) and sync on change",
   },
-  "command.config.desc": {
-    ja: "bkit 設定を確認・管理",
-    en: "Manage and inspect bkit configuration",
-  },
   "command.help.desc": {
     ja: "ヘルプを表示",
     en: "Show help",
@@ -264,6 +260,46 @@ const dict: Record<string, Record<Lang, string>> = {
   "setting.langDesc": {
     ja: "ja: 日本語, en: English",
     en: "ja: Japanese, en: English",
+  },
+  "setting.projectRoot": {
+    ja: "プロジェクトの保存先",
+    en: "Project root",
+  },
+  "setting.projectRootPrompt": {
+    ja: "プロジェクトの保存先フォルダ",
+    en: "Project root folder",
+  },
+  "setting.langSetup": {
+    ja: "言語の初期設定",
+    en: "Language setup",
+  },
+  "setting.langSetupHint": {
+    ja: "初回起動時に言語を尋ねるか",
+    en: "Prompt for language on first run",
+  },
+  "setting.rootSetup": {
+    ja: "保存先の初期設定",
+    en: "Project root setup",
+  },
+  "setting.rootSetupHint": {
+    ja: "初回起動時に保存先を尋ねるか",
+    en: "Prompt for project root on first run",
+  },
+  "setting.setupPrompt": {
+    ja: "初期設定を有効にしますか？",
+    en: "Enable initial setup?",
+  },
+  "setting.onboardingOrder": {
+    ja: "初期設定の順序",
+    en: "Onboarding order",
+  },
+  "setting.onboardingOrderHint": {
+    ja: "lang,projectRoot の順序を指定",
+    en: "Specify order (lang,projectRoot)",
+  },
+  "setting.onboardingOrderPrompt": {
+    ja: "初期設定の順序 (lang,projectRoot)",
+    en: "Onboarding order (lang,projectRoot)",
   },
   "bump.selectType": {
     ja: "バージョン更新方法を選択",
@@ -336,6 +372,14 @@ const dict: Record<string, Record<Lang, string>> = {
   "onboarding.saved": {
     ja: "初期設定を保存しました。",
     en: "Initial settings saved.",
+  },
+  "onboarding.projectRootPrompt": {
+    ja: "プロジェクトの保存先フォルダ（絶対パス）を入力してください",
+    en: "Enter the project root folder (absolute path)",
+  },
+  "onboarding.projectRootInput": {
+    ja: "プロジェクトの保存先フォルダ名",
+    en: "Project root folder name",
   },
 };
 

@@ -10,11 +10,13 @@ import { handleBuild } from "./build.js";
 import { handleSync } from "./sync.js";
 import { readdir } from "node:fs/promises";
 import { resolveLang, t } from "../utils/i18n.js";
+import { loadSettings, resolveProjectRoot } from "../utils/settings.js";
 
 type ProjectEntry = { name: string; configPath: string };
 
 async function discoverProjects(cwd: string): Promise<ProjectEntry[]> {
-  const base = resolve(cwd, "project");
+  const settings = await loadSettings();
+  const base = resolveProjectRoot(settings);
   if (!(await pathExists(base))) return [];
   const entries = await readdir(base, { withFileTypes: true });
   const found: ProjectEntry[] = [];
@@ -38,9 +40,10 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
   const { info: log } = createLogger({ quiet });
 
+  const settings = await loadSettings();
   const projects = await discoverProjects(process.cwd());
   if (!projects.length) {
-    console.error("No projects found under ./project");
+    console.error(`No projects found under ${resolveProjectRoot(settings)}`);
     return;
   }
 
