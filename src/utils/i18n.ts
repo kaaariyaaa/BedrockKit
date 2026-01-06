@@ -325,6 +325,18 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: " (min_engine_version={value})",
     en: " (min_engine_version={value})",
   },
+  "onboarding.langPrompt": {
+    ja: "表示言語を選択してください",
+    en: "Select display language",
+  },
+  "onboarding.cancelled": {
+    ja: "セットアップを中止しました。",
+    en: "Setup cancelled.",
+  },
+  "onboarding.saved": {
+    ja: "初期設定を保存しました。",
+    en: "Initial settings saved.",
+  },
 };
 
 export function t(key: string, lang: Lang = "ja", params: Record<string, string> = {}): string {

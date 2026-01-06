@@ -10,7 +10,7 @@ import { printBanner, printCommandHeader } from "./utils/ui.js";
 import { printHelp } from "./help.js";
 import type { Command, Lang } from "./types.js";
 import { resolveLang, t } from "./utils/i18n.js";
-import { loadSettings } from "./utils/settings.js";
+import { ensureSettings, loadSettings } from "./utils/settings.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -87,8 +87,17 @@ async function runInteractive(commands: Command[], lang: Lang): Promise<void> {
 async function main(): Promise<void> {
   const [, , ...argvRaw] = process.argv;
   const { args: argvNoLang, langInput } = stripLang(argvRaw);
-  const settings = await loadSettings();
-  const lang = resolveLang(langInput ?? extractLang(argvRaw), settings.lang);
+  const langFlag = langInput ?? extractLang(argvRaw);
+  let settings = await loadSettings();
+  if (!settings.initialized) {
+    try {
+      settings = await ensureSettings(langFlag);
+    } catch (err) {
+      process.exitCode = 1;
+      return;
+    }
+  }
+  const lang = resolveLang(langFlag, settings.lang);
   const interactiveFlag =
     argvNoLang.includes("--interactive") || argvNoLang.includes("-i");
   const argv = argvNoLang.filter(
