@@ -301,6 +301,38 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "初期設定の順序 (lang,projectRoot)",
     en: "Onboarding order (lang,projectRoot)",
   },
+  "update.available": {
+    ja: "新しいバージョンが見つかりました: {current} → {latest}",
+    en: "Update available: {current} → {latest}",
+  },
+  "update.choice": {
+    ja: "アップデートしますか？",
+    en: "Would you like to update?",
+  },
+  "update.now": {
+    ja: "今すぐ更新",
+    en: "Update now",
+  },
+  "update.later": {
+    ja: "後で",
+    en: "Later",
+  },
+  "update.skip": {
+    ja: "このバージョンはスキップ",
+    en: "Skip this version",
+  },
+  "update.running": {
+    ja: "アップデート中...",
+    en: "Updating...",
+  },
+  "update.done": {
+    ja: "アップデート完了",
+    en: "Update complete",
+  },
+  "update.failed": {
+    ja: "アップデートに失敗しました",
+    en: "Update failed",
+  },
   "bump.selectType": {
     ja: "バージョン更新方法を選択",
     en: "Select bump type",

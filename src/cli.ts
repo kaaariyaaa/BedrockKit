@@ -10,7 +10,9 @@ import { printBanner, printCommandHeader } from "./utils/ui.js";
 import { printHelp } from "./help.js";
 import type { Command, Lang } from "./types.js";
 import { resolveLang, t } from "./utils/i18n.js";
-import { ensureSettings, loadSettings } from "./utils/settings.js";
+import { ensureSettings, loadSettings, saveSettings } from "./utils/settings.js";
+import { checkForUpdate } from "./utils/update.js";
+import { spawn } from "node:child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,7 +20,7 @@ const root = resolve(__dirname, "..");
 
 const pkg = JSON.parse(
   readFileSync(resolve(root, "package.json"), { encoding: "utf8" }),
-) as { version?: string };
+) as { version?: string; name?: string };
 
 function findCommand(name: string | undefined, commands: Command[]): Command | undefined {
   if (!name) return undefined;
@@ -96,6 +98,46 @@ async function main(): Promise<void> {
     return;
   }
   const lang = resolveLang(langFlag, settings.lang?.value);
+
+  // Update check (prompt only when TTY)
+  const pkgName = pkg.name ?? "@bedrockkit/cli";
+  if (process.stdout.isTTY) {
+    const update = await checkForUpdate(pkgName, pkg.version ?? "0.0.0", settings.update?.skipVersion);
+    if (update?.shouldPrompt) {
+      const choice = await select({
+        message: `${t("update.available", lang, { current: pkg.version ?? "0.0.0", latest: update.latest })}\n${t("update.choice", lang)}`,
+        options: [
+          { value: "now", label: t("update.now", lang) },
+          { value: "later", label: t("update.later", lang) },
+          { value: "skip", label: t("update.skip", lang) },
+        ],
+        initialValue: "later",
+      });
+      if (!isCancel(choice)) {
+        if (choice === "skip") {
+          settings.update = { skipVersion: update.latest };
+          await saveSettings(settings);
+        } else if (choice === "now") {
+          console.log(t("update.running", lang));
+          try {
+            await new Promise<void>((resolvePromise, reject) => {
+              const child = spawn("npm", ["i", "-g", pkgName], {
+                stdio: "inherit",
+                shell: true,
+              });
+              child.on("error", reject);
+              child.on("exit", (code) =>
+                code === 0 ? resolvePromise() : reject(new Error(`npm exited ${code}`)),
+              );
+            });
+            console.log(t("update.done", lang));
+          } catch {
+            console.error(t("update.failed", lang));
+          }
+        }
+      }
+    }
+  }
   const interactiveFlag =
     argvNoLang.includes("--interactive") || argvNoLang.includes("-i");
   const argv = argvNoLang.filter(
