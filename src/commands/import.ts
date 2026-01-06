@@ -275,6 +275,32 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     // default ignore files
     await writeIgnoreFiles(targetDir);
 
+    // Normalize manifest script language to javascript
+    if (behaviorPath) {
+      const manifestPath = resolve(targetDir, "packs/behavior/manifest.json");
+      if (await pathExists(manifestPath)) {
+        try {
+          const raw = await readFile(manifestPath, "utf8");
+          const manifest = JSON.parse(raw) as ManifestLite;
+          if (Array.isArray(manifest.modules)) {
+            let changed = false;
+            manifest.modules = manifest.modules.map((m) => {
+              if (m.type === "script" && m.language !== "javascript") {
+                changed = true;
+                return { ...m, language: "javascript" };
+              }
+              return m;
+            });
+            if (changed) {
+              await writeJson(manifestPath, manifest);
+            }
+          }
+        } catch {
+          // ignore manifest parse errors
+        }
+      }
+    }
+
     // Install dependencies if present and not skipped
     const deps = scriptInfo?.deps ?? [];
     if (deps.length && !skipInstall) {

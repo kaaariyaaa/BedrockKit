@@ -9,7 +9,7 @@ export type ManifestModule =
     }
   | {
       type: "script";
-      language: "javascript" | "typescript";
+      language: "javascript";
       entry: string;
       uuid: string;
       version: VersionTuple;
@@ -43,7 +43,7 @@ export type GenerateManifestOptions = {
   minEngine?: VersionTuple;
   includeScriptModule?: boolean;
   scriptEntry?: string;
-  scriptLanguage?: "javascript" | "typescript";
+  scriptLanguage?: "javascript";
   scriptDependencies?: ManifestScriptDependency[];
   scriptApiVersion?: string;
   scriptApiVersions?: ScriptApiVersionMap;
@@ -205,7 +205,7 @@ export function generateManifest(opts: GenerateManifestOptions): Manifest {
   if (opts.type === "behavior" && opts.includeScriptModule !== false) {
     modules.push({
       type: "script",
-      language: opts.scriptLanguage ?? "javascript",
+      language: "javascript",
       entry: opts.scriptEntry ?? "scripts/main.js",
       uuid: randomUUID(),
       version,
