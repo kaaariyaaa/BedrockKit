@@ -1,5 +1,6 @@
 import { cp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { createRequire } from "node:module";
 import { select, isCancel, confirm } from "@clack/prompts";
 import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
 import { createLogger } from "../core/logger.js";
@@ -120,7 +121,8 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     }
     process.env.PROJECT_NAME = projectName;
     process.env.MINECRAFT_PRODUCT = targetConfig.product;
-    const coreBuild = await import("@minecraft/core-build-tasks");
+    const require = createRequire(import.meta.url);
+    const coreBuild = require("@minecraft/core-build-tasks");
     const copyTask = (coreBuild as any).copyTask as
       | ((params: CopyTaskParameters) => () => void)
       | undefined;

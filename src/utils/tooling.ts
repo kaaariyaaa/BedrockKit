@@ -98,9 +98,11 @@ main().catch((err) => {
 const localPackageScript = `import { resolve, dirname } from "node:path";
 import { stat } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 
 async function getZipTask() {
-  const coreBuild = await import("@minecraft/core-build-tasks");
+  const require = createRequire(import.meta.url);
+  const coreBuild = require("@minecraft/core-build-tasks");
   const task = coreBuild.zipTask || coreBuild["zipTask"];
   if (!task) throw new Error("zipTask not found in @minecraft/core-build-tasks");
   return task;

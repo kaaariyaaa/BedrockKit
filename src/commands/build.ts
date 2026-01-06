@@ -1,6 +1,7 @@
 import { rm, cp, stat } from "node:fs/promises";
 import { dirname, resolve, relative } from "node:path";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveConfigPath, resolveOutDir } from "../core/config.js";
 import type { CommandContext } from "../types.js";
@@ -142,7 +143,8 @@ async function getBundleTask(): Promise<
     minifyWhitespace?: boolean;
   }) => (done: (err?: unknown) => void) => unknown
 > {
-  const coreBuild = await import("@minecraft/core-build-tasks");
+  const require = createRequire(import.meta.url);
+  const coreBuild = require("@minecraft/core-build-tasks");
   const task = (coreBuild as any).bundleTask;
   if (!task) throw new Error("bundleTask not found in @minecraft/core-build-tasks");
   return task;

@@ -1,6 +1,6 @@
 {
   "name": "@bedrockkit/cli",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "BedrockKit CLI for Bedrock addon/resource pack workflows",
   "type": "module",
   "bin": {

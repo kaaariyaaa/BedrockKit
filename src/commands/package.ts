@@ -142,8 +142,9 @@ async function getZipTask(): Promise<
   (outputFile: string, contents: { contents: string[]; targetPath?: string }[]) => any
 > {
   // core-build-tasks exports CJS; use dynamic import to access zipTask property.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const coreBuild = await import("@minecraft/core-build-tasks");
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const coreBuild = require("@minecraft/core-build-tasks");
   const task = (coreBuild as any).zipTask;
   if (!task) {
     throw new Error("zipTask not found in @minecraft/core-build-tasks");

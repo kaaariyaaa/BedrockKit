@@ -246,14 +246,14 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   const behaviorManifest = packSelection.behavior
     ? generateManifest({
         type: "behavior",
-        name: targetName,
-        includeScriptModule: includeScript,
-        scriptEntry: manifestScriptEntry,
-        scriptLanguage,
-        scriptApiVersion,
-        scriptApiVersions,
-        scriptApiSelection,
-      })
+      name: targetName,
+      includeScriptModule: includeScript,
+      scriptEntry: manifestScriptEntry,
+      scriptLanguage: "javascript",
+      scriptApiVersion,
+      scriptApiVersions,
+      scriptApiSelection,
+    })
     : undefined;
 
   const resourceManifest = packSelection.resource

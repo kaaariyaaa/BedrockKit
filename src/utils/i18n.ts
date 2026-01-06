@@ -269,37 +269,37 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "プロジェクトの保存先フォルダ",
     en: "Project root folder",
   },
-  "setting.langSetup": {
-    ja: "言語の初期設定",
-    en: "Language setup",
+  "update.available": {
+    ja: "新しいバージョンが見つかりました: {current} → {latest}",
+    en: "Update available: {current} → {latest}",
   },
-  "setting.langSetupHint": {
-    ja: "初回起動時に言語を尋ねるか",
-    en: "Prompt for language on first run",
+  "update.choice": {
+    ja: "アップデートしますか？",
+    en: "Would you like to update?",
   },
-  "setting.rootSetup": {
-    ja: "保存先の初期設定",
-    en: "Project root setup",
+  "update.now": {
+    ja: "今すぐ更新",
+    en: "Update now",
   },
-  "setting.rootSetupHint": {
-    ja: "初回起動時に保存先を尋ねるか",
-    en: "Prompt for project root on first run",
+  "update.later": {
+    ja: "後で",
+    en: "Later",
   },
-  "setting.setupPrompt": {
-    ja: "初期設定を有効にしますか？",
-    en: "Enable initial setup?",
+  "update.skip": {
+    ja: "このバージョンはスキップ",
+    en: "Skip this version",
   },
-  "setting.onboardingOrder": {
-    ja: "初期設定の順序",
-    en: "Onboarding order",
+  "update.running": {
+    ja: "アップデート中...",
+    en: "Updating...",
   },
-  "setting.onboardingOrderHint": {
-    ja: "lang,projectRoot の順序を指定",
-    en: "Specify order (lang,projectRoot)",
+  "update.done": {
+    ja: "アップデート完了",
+    en: "Update complete",
   },
-  "setting.onboardingOrderPrompt": {
-    ja: "初期設定の順序 (lang,projectRoot)",
-    en: "Onboarding order (lang,projectRoot)",
+  "update.failed": {
+    ja: "アップデートに失敗しました",
+    en: "Update failed",
   },
   "bump.selectType": {
     ja: "バージョン更新方法を選択",

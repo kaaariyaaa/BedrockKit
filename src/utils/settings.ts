@@ -16,6 +16,9 @@ export type Settings = {
     onboarding?: boolean;
   };
   onboardingOrder?: SettingKey[];
+  update?: {
+    skipVersion?: string;
+  };
 };
 
 const settingsDir = resolve(process.cwd(), ".bkit");
