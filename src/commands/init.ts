@@ -39,6 +39,7 @@ import { writeFile, cp } from "node:fs/promises";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import { writeLocalToolScripts } from "../utils/tooling.js";
+import { loadSettings, resolveProjectRoot } from "../utils/settings.js";
 
 const cwd = process.cwd();
 
@@ -88,7 +89,8 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   const dirFlag =
     (parsed.flags.dir as string | undefined) ??
     (parsed.flags["target-dir"] as string | undefined);
-  const baseDir = resolve(cwd, "project");
+  const settings = await loadSettings();
+  const baseDir = resolveProjectRoot(settings);
   const nameForPath = projectName ?? "addon";
   const targetDir = dirFlag ? resolve(cwd, dirFlag) : resolve(baseDir, nameForPath);
   const targetName =

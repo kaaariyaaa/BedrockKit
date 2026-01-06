@@ -337,6 +337,14 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "初期設定を保存しました。",
     en: "Initial settings saved.",
   },
+  "onboarding.projectRootPrompt": {
+    ja: "プロジェクトの保存先フォルダ（絶対パス）を入力してください",
+    en: "Enter the project root folder (absolute path)",
+  },
+  "onboarding.projectRootInput": {
+    ja: "プロジェクトの保存先フォルダ名",
+    en: "Project root folder name",
+  },
 };
 
 export function t(key: string, lang: Lang = "ja", params: Record<string, string> = {}): string {

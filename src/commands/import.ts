@@ -11,6 +11,7 @@ import { fetchNpmVersionChannels } from "../utils/npm.js";
 import { convertJsTreeToTs } from "../utils/js-to-ts.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import { writeLocalToolScripts } from "../utils/tooling.js";
+import { loadSettings, resolveProjectRoot } from "../utils/settings.js";
 import { writeIgnoreFiles } from "../core/scaffold.js";
 
 type PackKind = "behavior" | "resource";
@@ -135,7 +136,8 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     projectName = unquote(String(input));
   }
 
-  const targetDir = resolve(process.cwd(), "project", projectName);
+  const settings = await loadSettings();
+  const targetDir = resolve(resolveProjectRoot(settings), projectName);
   if (await pathExists(targetDir)) {
     if (!force) {
       const overwrite = await confirm({
