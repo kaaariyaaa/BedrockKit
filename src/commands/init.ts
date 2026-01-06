@@ -19,13 +19,14 @@ import {
   generateManifest,
 } from "../manifest.js";
 import { knownTemplates, loadTemplateRegistry, materializeTemplate } from "../templates.js";
-import type { CommandContext, ScriptApiSelection, ScriptApiVersionMap } from "../types.js";
+import type { BkitConfig, CommandContext, ScriptApiSelection, ScriptApiVersionMap, ScriptLanguage } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
 import { writeFile, cp } from "node:fs/promises";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { resolveLang, t } from "../utils/i18n.js";
+import { writeLocalToolScripts } from "../utils/tooling.js";
 
 const cwd = process.cwd();
 
@@ -381,7 +382,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   }
 
   const configPath = resolve(targetDir, "bkit.config.json");
-  const config = {
+  const config: BkitConfig = {
     project: { name: targetName, version: "1.0.0" },
     template: template ?? "bkit-default",
     packSelection,
@@ -408,7 +409,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     script: includeScript
       ? {
           entry: scriptEntry,
-          language: scriptLanguage,
+          language: (scriptLanguage ?? "javascript") as ScriptLanguage,
           dependencies:
             Object.keys(scriptApiVersions).length > 0
               ? buildScriptDependenciesFromMap(scriptApiVersions, scriptApiVersion, scriptApiSelection)
@@ -467,6 +468,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     }
     await writeJson(configPath, config);
     await writeFile(resolve(targetDir, ".bkitignore"), `${bkitIgnore}\n`, { encoding: "utf8" });
+    await writeLocalToolScripts(targetDir, config);
     // ESLint config (TS + minecraft-linting)
     const eslintConfig = `import minecraftLinting from "eslint-plugin-minecraft-linting";
 import tsParser from "@typescript-eslint/parser";
@@ -593,10 +595,14 @@ function buildPackageJson(
       "@typescript-eslint/parser": "^8.13.0",
       "@typescript-eslint/eslint-plugin": "^8.13.0",
       "eslint-plugin-minecraft-linting": "^1.0.0",
+      esbuild: "^0.24.0",
+      "@minecraft/core-build-tasks": "^1.1.6",
     },
     scripts: {
       typecheck: "tsc --noEmit",
       lint: "eslint \"packs/behavior/scripts/**/*.{ts,js}\"",
+      "build:local": "node ./tools/local-build.mjs",
+      "package:local": "node ./tools/local-package.mjs",
     },
   };
 }

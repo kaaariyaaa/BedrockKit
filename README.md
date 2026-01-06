@@ -87,6 +87,7 @@ project/<addon-name>/
 - `bkit watch` – `./project/<name>` 配下を監視し、変更ごとにビルドと同期を自動実行。
 - `bkit config [--path <file>] [--json]` – 読み込んだ設定を確認。
 - `bkit setting [--lang <ja|en>]` – CLI 設定を変更（現在は表示言語の切り替えに対応）。フラグ未指定時は対話で選択。
+- `npm run build:local` / `npm run package:local` – 生成/インポートされた各プロジェクトには `tools/local-build.mjs` と `tools/local-package.mjs` を同梱。BedrockKit CLI がなくても、プロジェクト単体でビルド＆.mcpack/.mcaddon パッケージ化が可能です。
 
 ## 同期ターゲットの書き方
 - **core-build-tasks 経由**（開発版 Minecraft へデプロイ）  

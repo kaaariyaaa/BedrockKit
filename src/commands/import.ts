@@ -3,13 +3,14 @@ import { dirname, extname, join, resolve, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { confirm, intro, isCancel, outro, spinner, text } from "@clack/prompts";
-import type { CommandContext, ScriptDependency } from "../types.js";
+import type { BkitConfig, CommandContext, ScriptDependency } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists, writeJson } from "../utils/fs.js";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { fetchNpmVersionChannels } from "../utils/npm.js";
 import { convertJsTreeToTs } from "../utils/js-to-ts.js";
 import { resolveLang, t } from "../utils/i18n.js";
+import { writeLocalToolScripts } from "../utils/tooling.js";
 
 type PackKind = "behavior" | "resource";
 
@@ -230,7 +231,7 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     }
 
     // build config
-    const config = {
+    const config: BkitConfig = {
       project: { name: projectName, version: "1.0.0" },
       template: "imported",
       packSelection: {
@@ -300,11 +301,19 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
             type: "module",
             description: "Imported Bedrock addon project",
             dependencies: {},
+            devDependencies: {},
+            scripts: {},
           };
       pkgJson.dependencies = pkgJson.dependencies ?? {};
+      pkgJson.devDependencies = pkgJson.devDependencies ?? {};
+      pkgJson.scripts = pkgJson.scripts ?? {};
       for (const dep of resolvedDeps) {
         pkgJson.dependencies[dep.module_name] = dep.version;
       }
+      pkgJson.devDependencies["esbuild"] ??= "^0.24.0";
+      pkgJson.devDependencies["@minecraft/core-build-tasks"] ??= "^1.1.6";
+      pkgJson.scripts["build:local"] ??= "node ./tools/local-build.mjs";
+      pkgJson.scripts["package:local"] ??= "node ./tools/local-package.mjs";
       await writeJson(pkgPath, pkgJson);
 
       // スピナーを停止してから npm install を実行（出力が正しく表示されるように）
@@ -321,6 +330,9 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     } else {
       logInfo("Skipping dependency install.");
     }
+    // Local build/package helpers
+    await writeLocalToolScripts(targetDir, config as any);
+
     outro(`Imported project to ${targetDir}`);
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
