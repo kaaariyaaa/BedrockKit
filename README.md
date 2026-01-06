@@ -81,7 +81,7 @@ project/<addon-name>/
 - `bkit package [--out <name>]` – `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。
 - `bkit sync [--target <name>] [--build=false]` – ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` 指定で Minecraft 開発環境へデプロイ。
 - `bkit deps` – 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `manifest.json` を同期。
-- `bkit bump [major|minor|patch]` – プロジェクト/マニフェストのバージョンを一括更新。
+- `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` – プロジェクト/マニフェストのバージョンを更新（任意で min_engine_version も上書き）。
 - `bkit validate [--strict] [--json]` – config 和 manifest 的整合性チェック。
 - `bkit template <list|add|pull|rm>` – テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意のリポジトリを登録可能。
 - `bkit watch` – `./project/<name>` 配下を監視し、変更ごとにビルドと同期を自動実行。

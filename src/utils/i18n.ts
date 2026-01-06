@@ -265,6 +265,66 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "ja: 日本語, en: English",
     en: "ja: Japanese, en: English",
   },
+  "bump.selectType": {
+    ja: "バージョン更新方法を選択",
+    en: "Select bump type",
+  },
+  "bump.option.patch": {
+    ja: "パッチ (+0.0.1)",
+    en: "patch (+0.0.1)",
+  },
+  "bump.option.minor": {
+    ja: "マイナー (+0.1.0)",
+    en: "minor (+0.1.0)",
+  },
+  "bump.option.major": {
+    ja: "メジャー (+1.0.0)",
+    en: "major (+1.0.0)",
+  },
+  "bump.option.custom": {
+    ja: "バージョンを直接指定",
+    en: "set exact version",
+  },
+  "bump.enterVersion": {
+    ja: "バージョンを入力 (x.y.z)",
+    en: "Enter version (x.y.z)",
+  },
+  "bump.versionRequired": {
+    ja: "バージョンは必須です",
+    en: "Version is required",
+  },
+  "bump.updateMinEngine": {
+    ja: "min_engine_version を更新しますか？",
+    en: "Update min_engine_version?",
+  },
+  "bump.keepCurrent": {
+    ja: "変更しない",
+    en: "Keep current",
+  },
+  "bump.setMinEngine": {
+    ja: "手動入力",
+    en: "Set manually",
+  },
+  "bump.enterMinEngine": {
+    ja: "min_engine_version を入力 (x.y.z)",
+    en: "Enter min_engine_version (x.y.z)",
+  },
+  "bump.minEngineFormat": {
+    ja: "形式は x.y.z で入力してください",
+    en: "Format must be x.y.z",
+  },
+  "bump.doneSet": {
+    ja: "バージョンを {version} に設定しました{minEngine}。",
+    en: "Set version to {version}{minEngine}.",
+  },
+  "bump.doneBumped": {
+    ja: "{level} を適用し {version} に更新しました{minEngine}。",
+    en: "Bumped {level} to {version}{minEngine}.",
+  },
+  "bump.minEngineSuffix": {
+    ja: " (min_engine_version={value})",
+    en: " (min_engine_version={value})",
+  },
 };
 
 export function t(key: string, lang: Lang = "ja", params: Record<string, string> = {}): string {

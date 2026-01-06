@@ -81,7 +81,7 @@ Minimal example of `bkit.config.json`:
 - `bkit package [--out <name>]` – Create `.mcpack` (both packs) or `.mcaddon` (if both exist) from the `dist/` folder.
 - `bkit sync [--target <name>] [--build=false]` – Copy build outputs to locations defined in `config.sync.targets`. Specifying `product` allows deployment to Minecraft development environments.
 - `bkit deps` – Install selected Script API dependencies via npm and sync `bkit.config.json` and `manifest.json`.
-- `bkit bump [major|minor|patch]` – Bulk update project and manifest versions.
+- `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` – Update project/manifest versions (optionally override min_engine_version).
 - `bkit validate [--strict] [--json]` – Check consistency between config and manifest files.
 - `bkit template <list|add|pull|rm>` – Manage the template registry (`.bkit/templates*.json`). Any repository can be registered as `custom-git`.
 - `bkit watch` – Watch the project folder and automatically perform build and sync on changes.
