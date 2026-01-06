@@ -269,38 +269,6 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "プロジェクトの保存先フォルダ",
     en: "Project root folder",
   },
-  "setting.langSetup": {
-    ja: "言語の初期設定",
-    en: "Language setup",
-  },
-  "setting.langSetupHint": {
-    ja: "初回起動時に言語を尋ねるか",
-    en: "Prompt for language on first run",
-  },
-  "setting.rootSetup": {
-    ja: "保存先の初期設定",
-    en: "Project root setup",
-  },
-  "setting.rootSetupHint": {
-    ja: "初回起動時に保存先を尋ねるか",
-    en: "Prompt for project root on first run",
-  },
-  "setting.setupPrompt": {
-    ja: "初期設定を有効にしますか？",
-    en: "Enable initial setup?",
-  },
-  "setting.onboardingOrder": {
-    ja: "初期設定の順序",
-    en: "Onboarding order",
-  },
-  "setting.onboardingOrderHint": {
-    ja: "lang,projectRoot の順序を指定",
-    en: "Specify order (lang,projectRoot)",
-  },
-  "setting.onboardingOrderPrompt": {
-    ja: "初期設定の順序 (lang,projectRoot)",
-    en: "Onboarding order (lang,projectRoot)",
-  },
   "update.available": {
     ja: "新しいバージョンが見つかりました: {current} → {latest}",
     en: "Update available: {current} → {latest}",

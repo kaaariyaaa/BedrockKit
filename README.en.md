@@ -93,7 +93,7 @@ Minimal example of `bkit.config.json`:
 - `bkit validate [--strict] [--json]` – Check consistency between config and manifest files.
 - `bkit template <list|add|pull|rm>` – Manage the template registry (`.bkit/templates*.json`). Any repository can be registered as `custom-git`.
 - `bkit watch` – Watch the project folder and automatically perform build and sync on changes.
-- `bkit setting [--lang <ja|en>] [--project-root <path>]` – Manage CLI settings (language, project root, onboarding toggles/order). Prompts when no flags are provided.
+- `bkit setting [--lang <ja|en>] [--project-root <path>]` – Manage CLI settings (language, project root). Prompts when no flags are provided.
 - `npm run build:local` / `npm run package:local` – Each generated/imported project ships with `tools/local-build.mjs` and `tools/local-package.mjs`. You can build and create `.mcpack/.mcaddon` archives without the BedrockKit CLI.
 
 ## Sync Targets
