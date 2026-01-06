@@ -89,15 +89,13 @@ async function main(): Promise<void> {
   const { args: argvNoLang, langInput } = stripLang(argvRaw);
   const langFlag = langInput ?? extractLang(argvRaw);
   let settings = await loadSettings();
-  if (!settings.initialized) {
-    try {
-      settings = await ensureSettings(langFlag);
-    } catch (err) {
-      process.exitCode = 1;
-      return;
-    }
+  try {
+    settings = await ensureSettings(langFlag);
+  } catch (err) {
+    process.exitCode = 1;
+    return;
   }
-  const lang = resolveLang(langFlag, settings.lang);
+  const lang = resolveLang(langFlag, settings.lang?.value);
   const interactiveFlag =
     argvNoLang.includes("--interactive") || argvNoLang.includes("-i");
   const argv = argvNoLang.filter(
