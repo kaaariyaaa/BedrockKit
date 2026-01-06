@@ -7,7 +7,7 @@ import { parseArgs } from "../utils/args.js";
 import { pathExists, writeJson } from "../utils/fs.js";
 import { resolveConfigPath } from "../utils/config-discovery.js";
 import type { Manifest } from "../manifest.js";
-import { fetchNpmVersionChannels } from "../utils/npm.js";
+import { fetchNpmVersionChannels, formatVersionLabel } from "../utils/npm.js";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { resolveLang, t } from "../utils/i18n.js";
 
@@ -151,7 +151,7 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
     const choice = await select({
       message: t("init.selectVersion", lang, { pkg, channel: String(channelChoice) }),
       options: [
-        ...versions.map((v) => ({ value: v, label: v })),
+        ...versions.map((v) => ({ value: v, label: formatVersionLabel(v) })),
         { value: "__manual__", label: t("common.enterManually", lang) },
       ],
       initialValue: versions[0] ?? current,

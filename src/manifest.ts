@@ -76,6 +76,14 @@ export type ScriptApiVersionSelection = {
 
 export const DEFAULT_SCRIPT_API_VERSION = "1.11.0";
 
+function normalizeManifestVersion(version: string): string {
+  const m = version.match(/^(\d+\.\d+\.\d+)(?:-([0-9A-Za-z]+))?/);
+  if (!m) return version;
+  const base = m[1]!;
+  const tag = m[2];
+  return tag ? `${base}-${tag}` : base;
+}
+
 export function buildScriptDependencies(
   version: string = DEFAULT_SCRIPT_API_VERSION,
   selection: ScriptApiVersionSelection = {
@@ -87,24 +95,25 @@ export function buildScriptDependencies(
     serverGametest: false,
     serverAdmin: false,
     debugUtilities: false,
-    vanillaData: false,
-  },
+      vanillaData: false,
+    },
 ): ManifestScriptDependency[] {
+  const v = normalizeManifestVersion(version);
   return [
-    ...(selection.server !== false ? [{ module_name: "@minecraft/server", version }] : []),
-    ...(selection.serverUi !== false ? [{ module_name: "@minecraft/server-ui", version }] : []),
-    ...(selection.common !== false ? [{ module_name: "@minecraft/common", version }] : []),
-    ...(selection.math !== false ? [{ module_name: "@minecraft/math", version }] : []),
-    ...(selection.serverNet !== false ? [{ module_name: "@minecraft/server-net", version }] : []),
+    ...(selection.server !== false ? [{ module_name: "@minecraft/server", version: v }] : []),
+    ...(selection.serverUi !== false ? [{ module_name: "@minecraft/server-ui", version: v }] : []),
+    ...(selection.common !== false ? [{ module_name: "@minecraft/common", version: v }] : []),
+    ...(selection.math !== false ? [{ module_name: "@minecraft/math", version: v }] : []),
+    ...(selection.serverNet !== false ? [{ module_name: "@minecraft/server-net", version: v }] : []),
     ...(selection.serverGametest !== false
-      ? [{ module_name: "@minecraft/server-gametest", version }]
+      ? [{ module_name: "@minecraft/server-gametest", version: v }]
       : []),
-    ...(selection.serverAdmin !== false ? [{ module_name: "@minecraft/server-admin", version }] : []),
+    ...(selection.serverAdmin !== false ? [{ module_name: "@minecraft/server-admin", version: v }] : []),
     ...(selection.debugUtilities !== false
-      ? [{ module_name: "@minecraft/debug-utilities", version }]
+      ? [{ module_name: "@minecraft/debug-utilities", version: v }]
       : []),
     ...(selection.vanillaData !== false
-      ? [{ module_name: "@minecraft/vanilla-data", version }]
+      ? [{ module_name: "@minecraft/vanilla-data", version: v }]
       : []),
   ].filter(Boolean) as ManifestScriptDependency[];
 }
@@ -126,42 +135,57 @@ export function buildScriptDependenciesFromMap(
 ): ManifestScriptDependency[] {
   const deps: ManifestScriptDependency[] = [];
   if (selection.server !== false) {
-    deps.push({ module_name: "@minecraft/server", version: versions.server ?? fallback });
+    deps.push({
+      module_name: "@minecraft/server",
+      version: normalizeManifestVersion(versions.server ?? fallback),
+    });
   }
   if (selection.serverUi !== false) {
-    deps.push({ module_name: "@minecraft/server-ui", version: versions.serverUi ?? fallback });
+    deps.push({
+      module_name: "@minecraft/server-ui",
+      version: normalizeManifestVersion(versions.serverUi ?? fallback),
+    });
   }
   if (selection.common !== false) {
-    deps.push({ module_name: "@minecraft/common", version: versions.common ?? fallback });
+    deps.push({
+      module_name: "@minecraft/common",
+      version: normalizeManifestVersion(versions.common ?? fallback),
+    });
   }
   if (selection.math !== false) {
-    deps.push({ module_name: "@minecraft/math", version: versions.math ?? fallback });
+    deps.push({
+      module_name: "@minecraft/math",
+      version: normalizeManifestVersion(versions.math ?? fallback),
+    });
   }
   if (selection.serverNet !== false) {
-    deps.push({ module_name: "@minecraft/server-net", version: versions.serverNet ?? fallback });
+    deps.push({
+      module_name: "@minecraft/server-net",
+      version: normalizeManifestVersion(versions.serverNet ?? fallback),
+    });
   }
   if (selection.serverGametest !== false) {
     deps.push({
       module_name: "@minecraft/server-gametest",
-      version: versions.serverGametest ?? fallback,
+      version: normalizeManifestVersion(versions.serverGametest ?? fallback),
     });
   }
   if (selection.serverAdmin !== false) {
     deps.push({
       module_name: "@minecraft/server-admin",
-      version: versions.serverAdmin ?? fallback,
+      version: normalizeManifestVersion(versions.serverAdmin ?? fallback),
     });
   }
   if (selection.debugUtilities !== false) {
     deps.push({
       module_name: "@minecraft/debug-utilities",
-      version: versions.debugUtilities ?? fallback,
+      version: normalizeManifestVersion(versions.debugUtilities ?? fallback),
     });
   }
   if (selection.vanillaData !== false) {
     deps.push({
       module_name: "@minecraft/vanilla-data",
-      version: versions.vanillaData ?? fallback,
+      version: normalizeManifestVersion(versions.vanillaData ?? fallback),
     });
   }
   return deps;

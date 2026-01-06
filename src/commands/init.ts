@@ -23,7 +23,7 @@ import type { BkitConfig, CommandContext, ScriptApiSelection, ScriptApiVersionMa
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
 import { writeFile, cp } from "node:fs/promises";
-import { fetchNpmVersionChannels } from "../utils/npm.js";
+import { fetchNpmVersionChannels, formatVersionLabel } from "../utils/npm.js";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import { writeLocalToolScripts } from "../utils/tooling.js";
@@ -261,7 +261,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       const choice = await select({
         message: t("init.selectVersion", lang, { pkg, channel: String(channelChoice) }),
         options: [
-          ...versions.map((v) => ({ value: v, label: v })),
+          ...versions.map((v) => ({ value: v, label: formatVersionLabel(v) })),
           { value: "__manual__", label: t("common.enterManually", lang) },
         ],
         initialValue: versions[0] ?? current,
