@@ -10,10 +10,16 @@ A CLI tool for all-in-one Minecraft Bedrock Edition addon/resource pack developm
 - **OS**: Compatible with Windows, macOS, and Linux. Appropriate permissions are required when syncing to game development folders.
 
 ## Installation
-Clone the repository, install dependencies, and link it globally.
+Install globally from GitHub:
 
 ```bash
-git clone https://github.com/your-org/BedrockKit.git
+npm i -g @bedrockkit/cli
+```
+
+If you want to use a local clone:
+
+```bash
+git clone https://github.com/kaaariyaaa/BedrockKit.git
 cd BedrockKit
 npm install
 npm run build

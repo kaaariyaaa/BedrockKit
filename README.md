@@ -10,10 +10,10 @@ Minecraft Bedrock Edition 向けのアドオン／リソースパック開発を
 - **OS**: Windows / macOS / Linux いずれでも利用可能。Sync でゲームの開発用フォルダへコピーする際は、対象環境に合わせた権限が必要です。
 
 ## インストール
-公開後は npm から一発インストールできます。
+GitHub からグローバルにインストールできます。
 
 ```bash
-npm install -g @bedrockkit/cli
+npm i -g @bedrockkit/cli
 ```
 
 リポジトリをクローンして使う場合は次のとおりです。

@@ -1,11 +1,25 @@
 {
-  "name": "bedrockkit",
-  "version": "0.0.0",
+  "name": "@bedrockkit/cli",
+  "version": "1.0.0",
   "description": "BedrockKit CLI for Bedrock addon/resource pack workflows",
   "type": "module",
   "bin": {
     "bkit": "./dist/cli.js"
   },
+  "files": [
+    "dist/",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaaariyaaa/BedrockKit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kaaariyaaa/BedrockKit/issues"
+  },
+  "homepage": "https://github.com/kaaariyaaa/BedrockKit#readme",
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.json",
