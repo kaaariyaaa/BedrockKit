@@ -468,6 +468,34 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     }
     await writeJson(configPath, config);
     await writeFile(resolve(targetDir, ".bkitignore"), `${bkitIgnore}\n`, { encoding: "utf8" });
+    const gitIgnore = [
+      "# Logs",
+      "*.log",
+      "npm-debug.log*",
+      "yarn-debug.log*",
+      "pnpm-debug.log*",
+      "",
+      "# Dependencies",
+      "node_modules/",
+      "",
+      "# Build outputs",
+      "dist/",
+      ".watch-dist/",
+      "",
+      "# Env / cache",
+      ".env",
+      ".env.local",
+      ".bkit/",
+      "",
+      "# IDE / OS",
+      ".vscode/",
+      ".idea/",
+      ".DS_Store",
+      "Thumbs.db",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    await writeFile(resolve(targetDir, ".gitignore"), `${gitIgnore}\n`, { encoding: "utf8" });
     await writeLocalToolScripts(targetDir, config);
     // ESLint config (TS + minecraft-linting)
     const eslintConfig = `import minecraftLinting from "eslint-plugin-minecraft-linting";

@@ -269,11 +269,57 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     };
     await writeJson(resolve(targetDir, "bkit.config.json"), config);
 
-    // default ignore file
-    const ignore = ["dist/", "node_modules/", ".git/", ".vscode/", ".idea/", "*.log", "*.tmp"].join(
-      "\n",
-    );
-    await writeFile(resolve(targetDir, ".bkitignore"), `${ignore}\n`, { encoding: "utf8" });
+    // default ignore files
+    const bkitIgnore = [
+      "# Build output",
+      "dist/",
+      "",
+      "# Dependencies",
+      "node_modules/",
+      "",
+      "# VCS / editor",
+      ".git/",
+      ".vscode/",
+      ".idea/",
+      ".DS_Store",
+      "Thumbs.db",
+      "",
+      "# Logs / temp",
+      "*.log",
+      "*.tmp",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    await writeFile(resolve(targetDir, ".bkitignore"), `${bkitIgnore}\n`, { encoding: "utf8" });
+
+    const gitIgnore = [
+      "# Logs",
+      "*.log",
+      "npm-debug.log*",
+      "yarn-debug.log*",
+      "pnpm-debug.log*",
+      "",
+      "# Dependencies",
+      "node_modules/",
+      "",
+      "# Build outputs",
+      "dist/",
+      ".watch-dist/",
+      "",
+      "# Env / cache",
+      ".env",
+      ".env.local",
+      ".bkit/",
+      "",
+      "# IDE / OS",
+      ".vscode/",
+      ".idea/",
+      ".DS_Store",
+      "Thumbs.db",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    await writeFile(resolve(targetDir, ".gitignore"), `${gitIgnore}\n`, { encoding: "utf8" });
 
     // Install dependencies if present and not skipped
     const deps = scriptInfo?.deps ?? [];
