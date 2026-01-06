@@ -37,17 +37,6 @@ export async function ensureSettings(langInput?: string | boolean): Promise<Sett
 
   intro("BedrockKit setup");
 
-  const rootInput = await text({
-    message: t("onboarding.projectRootPrompt", resolveLang(langInput)),
-    initialValue: resolve(process.cwd(), "project"),
-    validate: (v) => (!v.trim() ? t("common.required", resolveLang(langInput)) : undefined),
-  });
-  if (isCancel(rootInput)) {
-    outro(t("onboarding.cancelled", resolveLang(langInput)));
-    throw new Error("Setup cancelled");
-  }
-  const projectRoot = String(rootInput).trim();
-
   const choice = await select({
     message: t("onboarding.langPrompt", resolveLang(langInput)),
     options: [
@@ -61,6 +50,17 @@ export async function ensureSettings(langInput?: string | boolean): Promise<Sett
     throw new Error("Setup cancelled");
   }
   const lang = resolveLang(String(choice));
+
+  const rootInput = await text({
+    message: t("onboarding.projectRootPrompt", lang),
+    initialValue: resolve(process.cwd(), "project"),
+    validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
+  });
+  if (isCancel(rootInput)) {
+    outro(t("onboarding.cancelled", lang));
+    throw new Error("Setup cancelled");
+  }
+  const projectRoot = String(rootInput).trim();
   const next: Settings = { ...current, lang, initialized: true, projectRoot };
   await saveSettings(next);
   outro(t("onboarding.saved", lang));
