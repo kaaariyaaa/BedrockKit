@@ -1,6 +1,6 @@
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
-import { loadConfig, defaultConfigPath } from "../config.js";
+import { loadConfig, defaultConfigPath } from "../core/config.js";
 
 export async function handleConfig(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);

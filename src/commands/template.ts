@@ -4,7 +4,7 @@ import {
   saveTemplateRegistry,
   templateRegistryPath,
   cloneTemplate,
-} from "../templates.js";
+} from "../core/templates.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { resolveLang, t } from "../utils/i18n.js";

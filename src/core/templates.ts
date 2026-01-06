@@ -1,8 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { ensureDir, pathExists } from "./utils/fs.js";
 import { spawn } from "node:child_process";
+import { resolve } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { ensureDir, pathExists } from "../utils/fs.js";
 
 export const knownTemplates = [
   { value: "official-sample", label: "Official sample", hint: "Mojang sample packs" },
@@ -15,11 +15,7 @@ export type TemplateEntry = {
   path?: string;
 };
 
-export const templateRegistryPath = resolve(
-  process.cwd(),
-  ".bkit",
-  "templates.json",
-);
+export const templateRegistryPath = resolve(process.cwd(), ".bkit", "templates.json");
 
 export async function loadTemplateRegistry(): Promise<TemplateEntry[]> {
   if (!(await pathExists(templateRegistryPath))) {

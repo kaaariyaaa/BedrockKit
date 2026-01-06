@@ -1,11 +1,14 @@
-import { resolve, dirname } from "node:path";
-import type { Manifest } from "../manifest.js";
-import { loadConfig, validateConfig } from "../config.js";
+import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import type { Manifest } from "../core/manifest.js";
+import {
+  loadConfigContext,
+  resolveConfigPath,
+  validateConfig,
+} from "../core/config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
-import { readFile } from "node:fs/promises";
-import { resolveConfigPath } from "../utils/config-discovery.js";
 import { resolveLang } from "../utils/i18n.js";
 
 async function readManifest(path: string): Promise<Manifest> {
@@ -28,35 +31,43 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  let config;
+  let configCtx;
   try {
-    config = await loadConfig(configPath);
+    configCtx = await loadConfigContext(configPath);
   } catch (err) {
     issues.push(
       err instanceof Error ? err.message : `Failed to load config: ${String(err)}`,
     );
   }
 
-  if (!config) {
+  if (!configCtx) {
     report(issues, { json: jsonOut, configPath });
     return;
   }
 
+  const { config, rootDir } = configCtx;
+
   issues.push(...validateConfig(config));
 
-  const configDir = dirname(configPath);
-  const rootDir = config.paths?.root ? resolve(configDir, config.paths.root) : configDir;
-  const behaviorManifestPath = resolve(rootDir, config.packs.behavior, "manifest.json");
-  const resourceManifestPath = resolve(rootDir, config.packs.resource, "manifest.json");
+  const behaviorManifestPath = configCtx.behavior.path
+    ? resolve(configCtx.behavior.path, "manifest.json")
+    : null;
+  const resourceManifestPath = configCtx.resource.path
+    ? resolve(configCtx.resource.path, "manifest.json")
+    : null;
 
-  const behaviorExists = await pathExists(behaviorManifestPath);
-  const resourceExists = await pathExists(resourceManifestPath);
-  if (!behaviorExists) issues.push(`Missing behavior manifest at ${behaviorManifestPath}`);
-  if (!resourceExists) issues.push(`Missing resource manifest at ${resourceManifestPath}`);
+  const behaviorExists = behaviorManifestPath ? await pathExists(behaviorManifestPath) : false;
+  const resourceExists = resourceManifestPath ? await pathExists(resourceManifestPath) : false;
+  if (configCtx.behavior.enabled && !behaviorExists && behaviorManifestPath) {
+    issues.push(`Missing behavior manifest at ${behaviorManifestPath}`);
+  }
+  if (configCtx.resource.enabled && !resourceExists && resourceManifestPath) {
+    issues.push(`Missing resource manifest at ${resourceManifestPath}`);
+  }
 
   let behaviorManifest: Manifest | undefined;
   let resourceManifest: Manifest | undefined;
-  if (behaviorExists) {
+  if (behaviorExists && behaviorManifestPath) {
     try {
       behaviorManifest = await readManifest(behaviorManifestPath);
     } catch (err) {
@@ -67,7 +78,7 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
       );
     }
   }
-  if (resourceExists) {
+  if (resourceExists && resourceManifestPath) {
     try {
       resourceManifest = await readManifest(resourceManifestPath);
     } catch (err) {

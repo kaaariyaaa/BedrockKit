@@ -1,12 +1,12 @@
 import { rm, cp, stat } from "node:fs/promises";
 import { dirname, resolve, relative } from "node:path";
-import { loadConfig } from "../config.js";
+import { spawn } from "node:child_process";
+import { createLogger } from "../core/logger.js";
+import { loadConfigContext, resolveConfigPath, resolveOutDir } from "../core/config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
-import { resolveConfigPath } from "../utils/config-discovery.js";
 import { loadIgnoreRules, isIgnored } from "../utils/ignore.js";
-import { spawn } from "node:child_process";
 import { resolveLang } from "../utils/i18n.js";
 
 function shouldSkipTsScript(entryRel: string, scriptEntry: string | undefined, src: string, root: string): boolean {
@@ -20,7 +20,7 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
-  const log = jsonOut || quiet ? (_msg?: unknown) => {} : console.log;
+  const { info: log } = createLogger({ json: jsonOut, quiet });
   const outDirOverride =
     (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
     (typeof parsed.flags.outdir === "string" && parsed.flags.outdir) ||
@@ -38,18 +38,15 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const config = await loadConfig(configPath);
-  const configDir = dirname(configPath);
-  const rootDir = config.paths?.root
-    ? resolve(configDir, config.paths.root)
-    : configDir;
+  const configCtx = await loadConfigContext(configPath);
+  const { config, rootDir } = configCtx;
   const ignoreRules = await loadIgnoreRules(rootDir);
 
-  const outDir = resolve(rootDir, outDirOverride ?? config.build?.outDir ?? "dist");
-  const behaviorEnabled = config.packSelection?.behavior !== false;
-  const resourceEnabled = config.packSelection?.resource !== false;
-  const behaviorSrc = behaviorEnabled ? resolve(rootDir, config.packs.behavior) : null;
-  const resourceSrc = resourceEnabled ? resolve(rootDir, config.packs.resource) : null;
+  const outDir = resolveOutDir(configCtx, outDirOverride);
+  const behaviorEnabled = configCtx.behavior.enabled;
+  const resourceEnabled = configCtx.resource.enabled;
+  const behaviorSrc = configCtx.behavior.path;
+  const resourceSrc = configCtx.resource.path;
   const behaviorDest = behaviorSrc ? resolve(outDir, config.packs.behavior) : null;
   const resourceDest = resourceSrc ? resolve(outDir, config.packs.resource) : null;
 

@@ -58,20 +58,20 @@ export function printCommandHeader(commandName: string, description: string) {
     })
   );
   console.log(gradient.atlas(`  ${description}`));
-  console.log(pc.dim('  ' + '─'.repeat(50)));
+  console.log(pc.dim('  ' + '-'.repeat(50)));
   console.log('');
 }
 
 export function formatStep(step: string) {
-  return pc.bold(pc.cyan(`◆ ${step}`));
+  return pc.bold(pc.cyan(`>> ${step}`));
 }
 
 export function formatSuccess(msg: string) {
-  return pc.bold(pc.green(`✔ ${msg}`));
+  return pc.bold(pc.green(`[ok] ${msg}`));
 }
 
 export function formatError(msg: string) {
-  return pc.bold(pc.red(`✖ ${msg}`));
+  return pc.bold(pc.red(`[error] ${msg}`));
 }
 
 export function formatDim(msg: string) {

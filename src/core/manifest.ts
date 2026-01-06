@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { VersionTuple } from "./types.js";
+import type { VersionTuple } from "../types.js";
 
 export type ManifestModule =
   | {
@@ -84,9 +84,8 @@ function normalizeManifestVersion(version: string): string {
   return tag ? `${base}-${tag}` : base;
 }
 
-export function buildScriptDependencies(
-  version: string = DEFAULT_SCRIPT_API_VERSION,
-  selection: ScriptApiVersionSelection = {
+function defaultSelection(): ScriptApiVersionSelection {
+  return {
     server: true,
     serverUi: true,
     common: false,
@@ -95,8 +94,13 @@ export function buildScriptDependencies(
     serverGametest: false,
     serverAdmin: false,
     debugUtilities: false,
-      vanillaData: false,
-    },
+    vanillaData: false,
+  };
+}
+
+export function buildScriptDependencies(
+  version: string = DEFAULT_SCRIPT_API_VERSION,
+  selection: ScriptApiVersionSelection = defaultSelection(),
 ): ManifestScriptDependency[] {
   const v = normalizeManifestVersion(version);
   return [
@@ -121,17 +125,7 @@ export function buildScriptDependencies(
 export function buildScriptDependenciesFromMap(
   versions: ScriptApiVersionMap,
   fallback: string = DEFAULT_SCRIPT_API_VERSION,
-  selection: ScriptApiVersionSelection = {
-    server: true,
-    serverUi: true,
-    common: false,
-    math: false,
-    serverNet: false,
-    serverGametest: false,
-    serverAdmin: false,
-    debugUtilities: false,
-    vanillaData: false,
-  },
+  selection: ScriptApiVersionSelection = defaultSelection(),
 ): ManifestScriptDependency[] {
   const deps: ManifestScriptDependency[] = [];
   if (selection.server !== false) {
@@ -228,7 +222,6 @@ export function generateManifest(opts: GenerateManifestOptions): Manifest {
             opts.scriptApiVersion ?? DEFAULT_SCRIPT_API_VERSION,
             opts.scriptApiSelection,
           ));
-    // Exclude math/vanilla-data from manifest dependencies; they are bundled/imported directly.
     dependencies.push(
       ...scriptDeps.filter(
         (dep) =>

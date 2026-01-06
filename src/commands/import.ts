@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, readdir, stat, writeFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { dirname, extname, join, resolve, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
@@ -11,6 +11,7 @@ import { fetchNpmVersionChannels } from "../utils/npm.js";
 import { convertJsTreeToTs } from "../utils/js-to-ts.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import { writeLocalToolScripts } from "../utils/tooling.js";
+import { writeIgnoreFiles } from "../core/scaffold.js";
 
 type PackKind = "behavior" | "resource";
 
@@ -270,56 +271,7 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     await writeJson(resolve(targetDir, "bkit.config.json"), config);
 
     // default ignore files
-    const bkitIgnore = [
-      "# Build output",
-      "dist/",
-      "",
-      "# Dependencies",
-      "node_modules/",
-      "",
-      "# VCS / editor",
-      ".git/",
-      ".vscode/",
-      ".idea/",
-      ".DS_Store",
-      "Thumbs.db",
-      "",
-      "# Logs / temp",
-      "*.log",
-      "*.tmp",
-    ]
-      .filter(Boolean)
-      .join("\n");
-    await writeFile(resolve(targetDir, ".bkitignore"), `${bkitIgnore}\n`, { encoding: "utf8" });
-
-    const gitIgnore = [
-      "# Logs",
-      "*.log",
-      "npm-debug.log*",
-      "yarn-debug.log*",
-      "pnpm-debug.log*",
-      "",
-      "# Dependencies",
-      "node_modules/",
-      "",
-      "# Build outputs",
-      "dist/",
-      ".watch-dist/",
-      "",
-      "# Env / cache",
-      ".env",
-      ".env.local",
-      ".bkit/",
-      "",
-      "# IDE / OS",
-      ".vscode/",
-      ".idea/",
-      ".DS_Store",
-      "Thumbs.db",
-    ]
-      .filter(Boolean)
-      .join("\n");
-    await writeFile(resolve(targetDir, ".gitignore"), `${gitIgnore}\n`, { encoding: "utf8" });
+    await writeIgnoreFiles(targetDir);
 
     // Install dependencies if present and not skipped
     const deps = scriptInfo?.deps ?? [];

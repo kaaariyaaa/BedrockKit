@@ -1,13 +1,13 @@
 import { cp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { select, isCancel, confirm } from "@clack/prompts";
-import { loadConfig } from "../config.js";
+import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
+import { createLogger } from "../core/logger.js";
+import { loadConfigContext, resolveConfigPath, resolveOutDir } from "../core/config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
-import { resolveConfigPath } from "../utils/config-discovery.js";
 import { handleBuild } from "./build.js";
-import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
 import { resolveLang, t } from "../utils/i18n.js";
 
 export async function handleSync(ctx: CommandContext): Promise<void> {
@@ -16,7 +16,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const dryRun = !!parsed.flags["dry-run"];
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
-  const log = jsonOut || quiet ? (_msg?: unknown) => {} : console.log;
+  const { info: log } = createLogger({ json: jsonOut, quiet });
   const buildDirOverride =
     (typeof parsed.flags["build-dir"] === "string" && parsed.flags["build-dir"]) ||
     (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
@@ -40,18 +40,17 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const config = await loadConfig(configPath);
-  const configDir = dirname(configPath);
-  const rootDir = config.paths?.root ? resolve(configDir, config.paths.root) : configDir;
-  const buildDir = resolve(rootDir, buildDirOverride ?? config.build?.outDir ?? "dist");
-  const behaviorEnabled = config.packSelection?.behavior !== false;
-  const resourceEnabled = config.packSelection?.resource !== false;
+  const configCtx = await loadConfigContext(configPath);
+  const { config } = configCtx;
+  const buildDir = resolveOutDir(configCtx, buildDirOverride);
+  const behaviorEnabled = configCtx.behavior.enabled;
+  const resourceEnabled = configCtx.resource.enabled;
   const behaviorSrc = behaviorEnabled ? resolve(buildDir, config.packs.behavior) : null;
   const resourceSrc = resourceEnabled ? resolve(buildDir, config.packs.resource) : null;
 
   if (shouldBuild && !dryRun) {
     log("Running build before sync...");
-    const forward: string[] = [];
+    const forward: string[] = ["--config", configPath];
     if (jsonOut) forward.push("--json");
     if (quiet) forward.push("--quiet");
     if (buildDirOverride) forward.push("--out-dir", buildDirOverride);

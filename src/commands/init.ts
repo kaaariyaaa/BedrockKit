@@ -17,13 +17,25 @@ import {
   buildScriptDependencies,
   buildScriptDependenciesFromMap,
   generateManifest,
-} from "../manifest.js";
-import { knownTemplates, loadTemplateRegistry, materializeTemplate } from "../templates.js";
-import type { BkitConfig, CommandContext, ScriptApiSelection, ScriptApiVersionMap, ScriptLanguage } from "../types.js";
+} from "../core/manifest.js";
+import {
+  SCRIPT_API_OPTIONS,
+  createScriptApiVersionPicker,
+  defaultScriptApiSelection,
+  toScriptApiSelection,
+} from "../core/script-api.js";
+import { knownTemplates, loadTemplateRegistry, materializeTemplate } from "../core/templates.js";
+import { writeIgnoreFiles } from "../core/scaffold.js";
+import type {
+  BkitConfig,
+  CommandContext,
+  ScriptApiSelection,
+  ScriptApiVersionMap,
+  ScriptLanguage,
+} from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
 import { writeFile, cp } from "node:fs/promises";
-import { fetchNpmVersionChannels, formatVersionLabel } from "../utils/npm.js";
 import { runInstallCommand } from "../utils/npm-install.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import { writeLocalToolScripts } from "../utils/tooling.js";
@@ -39,23 +51,12 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   const nonInteractive = !!parsed.flags.yes;
   let includeScript = parsed.flags["no-script"] ? false : true;
   const scriptEntry = (parsed.flags["script-entry"] as string | undefined) ?? "scripts/main.ts";
-  const scriptLanguage: "typescript" | "javascript" | undefined = includeScript
-    ? "javascript"
-    : undefined;
+  const scriptLanguage: ScriptLanguage | undefined =
+    includeScript && scriptEntry.endsWith(".ts") ? "typescript" : includeScript ? "javascript" : undefined;
   let scriptApiVersion =
     (parsed.flags["script-api-version"] as string | undefined) || DEFAULT_SCRIPT_API_VERSION;
   let scriptApiVersions: ScriptApiVersionMap = {};
-  let scriptApiSelection: ScriptApiSelection = {
-    server: true,
-    serverUi: true,
-    common: false,
-    math: false,
-    serverNet: false,
-    serverGametest: false,
-    serverAdmin: false,
-    debugUtilities: false,
-    vanillaData: false,
-  };
+  let scriptApiSelection: ScriptApiSelection = defaultScriptApiSelection();
   const eslintRulesFlag = parsed.flags["eslint-rules"] as string | undefined;
   const disableEslint = !!parsed.flags["no-eslint"];
   const availableEslintRules = ["minecraft-linting/avoid-unnecessary-command"];
@@ -163,17 +164,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   if (includeScript && !nonInteractive && parsed.flags["script-api-version"] === undefined) {
     const pkgChoice = await multiselect({
       message: t("init.selectPackages", lang),
-      options: [
-        { value: "server", label: "@minecraft/server", hint: "Core Script API" },
-        { value: "serverUi", label: "@minecraft/server-ui", hint: "UI helpers" },
-        { value: "common", label: "@minecraft/common", hint: "Shared utilities" },
-        { value: "math", label: "@minecraft/math", hint: "Math helpers" },
-        { value: "serverNet", label: "@minecraft/server-net", hint: "Net helpers" },
-        { value: "serverGametest", label: "@minecraft/server-gametest", hint: "Gametest API" },
-        { value: "serverAdmin", label: "@minecraft/server-admin", hint: "Admin API" },
-        { value: "debugUtilities", label: "@minecraft/debug-utilities", hint: "Debug helpers" },
-        { value: "vanillaData", label: "@minecraft/vanilla-data", hint: "Vanilla constants" },
-      ],
+      options: SCRIPT_API_OPTIONS.map((opt) => ({
+        value: opt.key,
+        label: opt.label,
+        hint: opt.hint,
+      })),
       initialValues: ["server", "serverUi"],
     });
     if (isCancel(pkgChoice)) {
@@ -181,126 +176,21 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       return;
     }
     const selected = new Set(pkgChoice as string[]);
-    scriptApiSelection = {
-      server: selected.has("server"),
-      serverUi: selected.has("serverUi"),
-      common: selected.has("common"),
-      math: selected.has("math"),
-      serverNet: selected.has("serverNet"),
-      serverGametest: selected.has("serverGametest"),
-      serverAdmin: selected.has("serverAdmin"),
-      debugUtilities: selected.has("debugUtilities"),
-      vanillaData: selected.has("vanillaData"),
-    };
+    scriptApiSelection = toScriptApiSelection(selected);
     if (!selected.size) {
       includeScript = false;
     }
 
-    const cached = new Map<string, { channel: string; versions: string[] }>();
-
-    const pickVersion = async (
-      pkg: string,
-      current: string,
-    ): Promise<string | null> => {
-      if (!cached.has(pkg)) {
-        const channels = await fetchNpmVersionChannels(pkg, { limit: 15 });
-        cached.set(pkg, {
-          channel: "stable",
-          versions: channels.stable.length
-            ? channels.stable
-            : [
-                ...channels.beta,
-                ...channels.alpha,
-                ...channels.preview,
-                ...channels.other,
-              ],
-        });
-        cached.set(`${pkg}:beta`, { channel: "beta", versions: channels.beta });
-        cached.set(`${pkg}:alpha`, { channel: "alpha", versions: channels.alpha });
-        cached.set(`${pkg}:preview`, { channel: "preview", versions: channels.preview });
-        cached.set(`${pkg}:other`, { channel: "other", versions: channels.other });
-      }
-
-      const channelChoice = await select({
-        message: t("init.selectChannel", lang, { pkg }),
-        options: [
-          { value: "stable", label: "stable" },
-          { value: "beta", label: "beta" },
-          { value: "alpha", label: "alpha" },
-          { value: "preview", label: "preview" },
-          { value: "other", label: "other" },
-          { value: "__manual__", label: t("common.enterManually", lang) },
-        ],
-        initialValue: "stable",
-      });
-      if (isCancel(channelChoice)) return null;
-
-      if (channelChoice === "__manual__") {
-        const manual = await text({
-          message: t("init.selectVersion", lang, { pkg, channel: "manual" }),
-          initialValue: current,
-          validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
-        });
-        return isCancel(manual) ? null : manual.trim();
-      }
-
-      const bucket =
-        channelChoice === "stable"
-          ? cached.get(pkg)
-          : cached.get(`${pkg}:${channelChoice}`);
-      const versions = bucket?.versions ?? [];
-      if (!versions.length) {
-        const manual = await text({
-          message: t("init.selectVersion", lang, { pkg, channel: String(channelChoice) }),
-          initialValue: current,
-          validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
-        });
-        return isCancel(manual) ? null : manual.trim();
-      }
-
-      const choice = await select({
-        message: t("init.selectVersion", lang, { pkg, channel: String(channelChoice) }),
-        options: [
-          ...versions.map((v) => ({ value: v, label: formatVersionLabel(v) })),
-          { value: "__manual__", label: t("common.enterManually", lang) },
-        ],
-        initialValue: versions[0] ?? current,
-      });
-      if (isCancel(choice)) return null;
-      if (choice === "__manual__") {
-        const manual = await text({
-          message: t("init.selectVersion", lang, { pkg, channel: "manual" }),
-          initialValue: current,
-          validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
-        });
-        return isCancel(manual) ? null : manual.trim();
-      }
-      return String(choice);
-    };
-
+    const pickVersion = createScriptApiVersionPicker(lang);
     scriptApiVersions = {};
-    const selectedPackages: [keyof ScriptApiVersionMap, string][] = [];
-    if (scriptApiSelection.server) selectedPackages.push(["server", "@minecraft/server"]);
-    if (scriptApiSelection.serverUi) selectedPackages.push(["serverUi", "@minecraft/server-ui"]);
-    if (scriptApiSelection.common) selectedPackages.push(["common", "@minecraft/common"]);
-    if (scriptApiSelection.math) selectedPackages.push(["math", "@minecraft/math"]);
-    if (scriptApiSelection.serverNet) selectedPackages.push(["serverNet", "@minecraft/server-net"]);
-    if (scriptApiSelection.serverGametest)
-      selectedPackages.push(["serverGametest", "@minecraft/server-gametest"]);
-    if (scriptApiSelection.serverAdmin) selectedPackages.push(["serverAdmin", "@minecraft/server-admin"]);
-    if (scriptApiSelection.debugUtilities)
-      selectedPackages.push(["debugUtilities", "@minecraft/debug-utilities"]);
-    if (scriptApiSelection.vanillaData)
-      selectedPackages.push(["vanillaData", "@minecraft/vanilla-data"]);
-    // math not treated as Script API dependency
-
-    for (const [key, pkg] of selectedPackages) {
-      const picked = await pickVersion(pkg, scriptApiVersion);
+    for (const opt of SCRIPT_API_OPTIONS) {
+      if (!scriptApiSelection[opt.key]) continue;
+      const picked = await pickVersion(opt.pkg, scriptApiVersion);
       if (picked === null) {
         outro(t("common.cancelled", lang));
         return;
       }
-      scriptApiVersions[key] = picked;
+      scriptApiVersions[opt.key] = picked;
       if (!scriptApiVersion) {
         scriptApiVersion = picked;
       }
@@ -440,26 +330,6 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       await cp(templatePath, targetDir, { recursive: true, force: true });
     }
 
-    const bkitIgnore = [
-      "# Build output",
-      "dist/",
-      "",
-      "# Dependencies",
-      "node_modules/",
-      "",
-      "# VCS / editor",
-      ".git/",
-      ".vscode/",
-      ".idea/",
-      ".DS_Store",
-      "Thumbs.db",
-      "",
-      "# Logs / temp",
-      "*.log",
-      "*.tmp",
-    ]
-      .filter(Boolean)
-      .join("\n");
     if (behaviorManifest) {
       await writeJson(resolve(targetDir, "packs/behavior/manifest.json"), behaviorManifest);
     }
@@ -467,35 +337,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
       await writeJson(resolve(targetDir, "packs/resource/manifest.json"), resourceManifest);
     }
     await writeJson(configPath, config);
-    await writeFile(resolve(targetDir, ".bkitignore"), `${bkitIgnore}\n`, { encoding: "utf8" });
-    const gitIgnore = [
-      "# Logs",
-      "*.log",
-      "npm-debug.log*",
-      "yarn-debug.log*",
-      "pnpm-debug.log*",
-      "",
-      "# Dependencies",
-      "node_modules/",
-      "",
-      "# Build outputs",
-      "dist/",
-      ".watch-dist/",
-      "",
-      "# Env / cache",
-      ".env",
-      ".env.local",
-      ".bkit/",
-      "",
-      "# IDE / OS",
-      ".vscode/",
-      ".idea/",
-      ".DS_Store",
-      "Thumbs.db",
-    ]
-      .filter(Boolean)
-      .join("\n");
-    await writeFile(resolve(targetDir, ".gitignore"), `${gitIgnore}\n`, { encoding: "utf8" });
+    await writeIgnoreFiles(targetDir);
     await writeLocalToolScripts(targetDir, config);
     // ESLint config (TS + minecraft-linting)
     const eslintConfig = `import minecraftLinting from "eslint-plugin-minecraft-linting";

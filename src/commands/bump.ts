@@ -1,8 +1,8 @@
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { select, text, isCancel, outro } from "@clack/prompts";
-import type { Manifest, ManifestDependency } from "../manifest.js";
-import { loadConfig } from "../config.js";
+import type { Manifest, ManifestDependency } from "../core/manifest.js";
+import { loadConfigContext, resolveConfigPath } from "../core/config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists, writeJson } from "../utils/fs.js";
@@ -12,7 +12,6 @@ import {
   bumpVersionString,
   stringToVersionTuple,
 } from "../utils/version.js";
-import { resolveConfigPath } from "../utils/config-discovery.js";
 import { resolveLang, t } from "../utils/i18n.js";
 
 async function readManifest(path: string): Promise<Manifest> {
@@ -56,11 +55,8 @@ export async function handleBump(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  const config = await loadConfig(configPath);
-  const configDir = dirname(configPath);
-  const rootDir = config.paths?.root
-    ? resolve(configDir, config.paths.root)
-    : configDir;
+  const configCtx = await loadConfigContext(configPath);
+  const { config, rootDir } = configCtx;
 
   let nextVersionString = toVersion ? String(toVersion) : undefined;
   let nextLevel = level;
@@ -139,8 +135,12 @@ export async function handleBump(ctx: CommandContext): Promise<void> {
 
   config.project.version = nextVersion;
 
-  const behaviorManifestPath = resolve(rootDir, config.packs.behavior, "manifest.json");
-  const resourceManifestPath = resolve(rootDir, config.packs.resource, "manifest.json");
+  const behaviorManifestPath = configCtx.behavior.path
+    ? resolve(configCtx.behavior.path, "manifest.json")
+    : resolve(rootDir, config.packs.behavior, "manifest.json");
+  const resourceManifestPath = configCtx.resource.path
+    ? resolve(configCtx.resource.path, "manifest.json")
+    : resolve(rootDir, config.packs.resource, "manifest.json");
 
   if (!(await pathExists(behaviorManifestPath))) {
     console.error(`Behavior manifest not found: ${behaviorManifestPath}`);

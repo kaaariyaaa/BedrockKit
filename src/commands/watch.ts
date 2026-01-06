@@ -1,7 +1,8 @@
 import chokidar from "chokidar";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { intro, outro, multiselect, isCancel } from "@clack/prompts";
-import { loadConfig } from "../config.js";
+import { createLogger } from "../core/logger.js";
+import { loadConfigContext } from "../core/config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
@@ -35,7 +36,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     (typeof parsed.flags.outdir === "string" && parsed.flags.outdir) ||
     ".watch-dist";
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
-  const log = quiet ? (_msg?: unknown) => {} : console.log;
+  const { info: log } = createLogger({ quiet });
 
   const projects = await discoverProjects(process.cwd());
   if (!projects.length) {
@@ -73,9 +74,8 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   log(`Using watch build outDir: ${outDirOverride}`);
 
   for (const proj of selectedProjects) {
-    const config = await loadConfig(proj.configPath);
-    const configDir = dirname(proj.configPath);
-    const rootDir = config.paths?.root ? resolve(configDir, config.paths.root) : configDir;
+    const configCtx = await loadConfigContext(proj.configPath);
+    const { config, rootDir } = configCtx;
     const watchPaths = [];
     if (config.packSelection?.behavior !== false) {
       watchPaths.push(resolve(rootDir, config.packs.behavior));
