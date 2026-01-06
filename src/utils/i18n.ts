@@ -233,10 +233,6 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "複数プロジェクトを監視し、変更ごとに自動ビルド＋同期",
     en: "Watch projects, auto build (watch outDir) and sync on change",
   },
-  "command.config.desc": {
-    ja: "bkit 設定を確認・管理",
-    en: "Manage and inspect bkit configuration",
-  },
   "command.help.desc": {
     ja: "ヘルプを表示",
     en: "Show help",
