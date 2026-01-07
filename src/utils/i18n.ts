@@ -193,6 +193,18 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "監視するプロジェクトを選択",
     en: "Select projects to watch",
   },
+  "watch.selectMode": {
+    ja: "watch のビルド方式を選択",
+    en: "Select watch build mode",
+  },
+  "watch.mode.copyRecommended": {
+    ja: "copy（推奨）",
+    en: "copy (recommended)",
+  },
+  "watch.mode.link": {
+    ja: "link（シンボリックリンク）",
+    en: "link (symlink)",
+  },
   "watch.intro": {
     ja: "監視を開始します（変更で自動ビルド＋同期）",
     en: "Watching projects for changes (auto build + sync)",
