@@ -131,7 +131,7 @@ test("CLI commands (smoke tests)", async (t) => {
   await t.test("help", async () => {
     const res = runCli(["--help"], cwd);
     assert.equal(res.status, 0);
-    assert.ok(res.stdout.includes("Commands"));
+    assert.ok(/Commands|コマンド/.test(res.stdout));
   });
 
   await t.test("help command", async () => {
