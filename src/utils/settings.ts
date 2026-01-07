@@ -101,7 +101,7 @@ export async function ensureSettings(langInput?: string | boolean): Promise<Sett
   };
   if (!needs.lang && !needs.projectRoot) return current;
 
-  intro("BedrockKit setup");
+  intro(t("settings.setupTitle", resolveLang(langInput)));
 
   let lang = currentLang ?? resolveLang(langInput);
   let projectRoot = currentRoot ?? resolve(process.cwd(), "project");

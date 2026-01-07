@@ -57,8 +57,8 @@ function stripLang(argv: string[]): { args: string[]; langInput?: string } {
 }
 
 async function runInteractive(commands: Command[], lang: Lang): Promise<void> {
-  printBanner();
-  intro(pc.inverse(" Interactive Mode "));
+  printBanner(lang);
+  intro(pc.inverse(t("cli.interactiveMode", lang)));
   
   const choice = await select({
     message: t("cli.menuPrompt", lang),
@@ -145,7 +145,7 @@ async function main(): Promise<void> {
   );
   const [first, ...rest] = argv;
 
-  const commands: Command[] = buildCommands(lang, () => printHelp(commands));
+  const commands: Command[] = buildCommands(lang, () => printHelp(commands, lang));
 
   if (interactiveFlag || !first) {
     await runInteractive(commands, lang);
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
   }
 
   if (first === "-h" || first === "--help") {
-    printHelp(commands);
+    printHelp(commands, lang);
     return;
   }
 
@@ -164,8 +164,8 @@ async function main(): Promise<void> {
 
   const cmd = findCommand(first, commands);
   if (!cmd) {
-    console.error(`Unknown command: ${first}`);
-    printHelp(commands);
+    console.error(t("cli.unknownCommand", lang, { name: first }));
+    printHelp(commands, lang);
     process.exitCode = 1;
     return;
   }

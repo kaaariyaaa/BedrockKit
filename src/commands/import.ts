@@ -23,7 +23,7 @@ type ManifestLite = {
   dependencies?: ScriptDependency[];
 };
 
-async function unzip(archive: string, dest: string): Promise<void> {
+async function unzip(archive: string, dest: string, lang: string): Promise<void> {
   const isWin = process.platform === "win32";
   await ensureDir(dest);
   if (isWin) {
@@ -39,14 +39,20 @@ async function unzip(archive: string, dest: string): Promise<void> {
       );
       child.on("error", reject);
       child.on("exit", (code) =>
-        code === 0 ? resolve() : reject(new Error(`Expand-Archive exited with ${code}`)),
+        code === 0
+          ? resolve()
+          : reject(new Error(t("import.extractFailed", resolveLang(lang), { code: String(code) }))),
       );
     });
   } else {
     await new Promise<void>((resolve, reject) => {
       const child = spawn("unzip", ["-o", archive, "-d", dest], { stdio: "inherit" });
       child.on("error", reject);
-      child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`unzip exited ${code}`))));
+      child.on("exit", (code) =>
+        code === 0
+          ? resolve()
+          : reject(new Error(t("import.unzipFailed", resolveLang(lang), { code: String(code) }))),
+      );
     });
   }
 }
@@ -117,7 +123,7 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
   }
   archivePath = resolve(process.cwd(), unquote(archivePath));
   if (!(await pathExists(archivePath))) {
-    console.error(`Archive not found: ${archivePath}`);
+    console.error(t("import.archiveNotFound", lang, { path: archivePath }));
     process.exitCode = 1;
     return;
   }
@@ -159,14 +165,14 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
 
   const tmp = await mkdtemp(join(tmpdir(), "bkit-import-"));
   try {
-    logStep("Extracting archive...");
-    await unzip(archivePath, tmp);
-    logInfo("Archive extracted");
+    logStep(t("import.extracting", lang));
+    await unzip(archivePath, tmp, lang);
+    logInfo(t("import.extracted", lang));
 
-    logStep("Scanning manifests...");
+    logStep(t("import.scanning", lang));
     const manifests = await walkForManifests(tmp);
     if (!manifests.length) {
-      throw new Error("No manifest.json found in archive");
+      throw new Error(t("import.noManifestFound", lang));
     }
     let behaviorPath: string | null = null;
     let resourcePath: string | null = null;
@@ -188,9 +194,9 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
         // ignore parse errors for malformed manifests
       }
     }
-    logInfo("Manifests scanned");
+    logInfo(t("import.scanned", lang));
 
-    logStep("Copying files...");
+    logStep(t("import.copying", lang));
     await ensureDir(targetDir);
     if (behaviorPath) {
       await cp(behaviorPath, resolve(targetDir, "packs/behavior"), {
@@ -304,19 +310,27 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
     // Install dependencies if present and not skipped
     const deps = scriptInfo?.deps ?? [];
     if (deps.length && !skipInstall) {
-      logStep("Resolving dependency versions...");
+      logStep(t("import.resolvingDeps", lang));
       for (let i = 0; i < deps.length; i++) {
         const dep = deps[i]!;
         if (!dep.module_name || !dep.version) continue;
-        logInfo(`Resolving ${dep.module_name} (${i + 1}/${deps.length})...`);
+        logInfo(
+          t("import.resolvingDep", lang, {
+            name: dep.module_name,
+            index: String(i + 1),
+            total: String(deps.length),
+          }),
+        );
         const resolvedVersion = await resolveVersion(dep.module_name, dep.version);
-        logInfo(`  -> Resolved to ${resolvedVersion}`);
+        logInfo(
+          t("import.resolvedDep", lang, { version: resolvedVersion }),
+        );
         resolvedDeps.push({ module_name: dep.module_name, version: resolvedVersion });
       }
       const pkgs = resolvedDeps.map((d) => `${d.module_name}@${d.version}`);
       
       // Ensure package.json exists with dependencies
-      logStep("Writing package.json...");
+      logStep(t("import.writingPackage", lang));
       const pkgPath = resolve(targetDir, "package.json");
       const pkgJson = (await pathExists(pkgPath))
         ? JSON.parse(await readFile(pkgPath, "utf8"))
@@ -325,7 +339,7 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
             version: "1.0.0",
             private: true,
             type: "module",
-            description: "Imported Bedrock addon project",
+            description: t("import.packageDescription", lang),
             dependencies: {},
             devDependencies: {},
             scripts: {},
@@ -343,23 +357,23 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
       await writeJson(pkgPath, pkgJson);
 
       // スピナーを停止してから npm install を実行（出力が正しく表示されるように）
-      logStep("Installing dependencies...");
-      console.log("Running: npm install " + pkgs.join(" "));
+      logStep(t("import.installingDeps", lang));
+      console.log(t("import.npmRunning", lang, { packages: pkgs.join(" ") }));
 
       try {
         await runInstallCommand(targetDir, pkgs);
-        logInfo("Dependencies installed successfully.");
+        logInfo(t("import.depsInstalled", lang));
       } catch (err) {
-        console.error("Dependency installation failed:");
+        console.error(t("import.depsInstallFailed", lang));
         console.error(err instanceof Error ? err.message : String(err));
       }
     } else {
-      logInfo("Skipping dependency install.");
+      logInfo(t("import.skipInstall", lang));
     }
     // Local build/package helpers
     await writeLocalToolScripts(targetDir, config as any);
 
-    outro(`Imported project to ${targetDir}`);
+    outro(t("import.completed", lang, { path: targetDir }));
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     process.exitCode = 1;

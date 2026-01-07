@@ -111,9 +111,7 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
   const targets = config.sync?.targets ?? {};
   const targetNames = Object.keys(targets);
   if (!targetNames.length) {
-    console.error(
-      "No sync targets defined in config.sync.targets. Add entries like { dev: { behavior: \"/path/to/development_behavior_packs/<name>\", resource: \"/path/to/development_resource_packs/<name>\" } }",
-    );
+    console.error(t("link.noTargets", lang));
     process.exitCode = 1;
     return;
   }
@@ -138,12 +136,12 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
   const targetPaths = resolveTargetPaths(targetConfig, projectName);
 
   if (behaviorEnabled && !targetPaths.behavior) {
-    console.error(`Target '${targetName}' missing behavior path in sync.targets`);
+    console.error(t("link.targetMissingBehavior", lang, { target: targetName }));
     process.exitCode = 1;
     return;
   }
   if (resourceEnabled && !targetPaths.resource) {
-    console.error(`Target '${targetName}' missing resource path in sync.targets`);
+    console.error(t("link.targetMissingResource", lang, { target: targetName }));
     process.exitCode = 1;
     return;
   }
@@ -175,7 +173,7 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
     if (resourceEnabled) selected.push("resource");
   }
   if (!selected.length) {
-    console.error("No packs selected.");
+    console.error(t("link.noPacksSelected", lang));
     process.exitCode = 1;
     return;
   }
@@ -214,7 +212,7 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
         await rm(to, { recursive: true, force: true });
         if (!jsonOut) log(`${t("link.removed", lang)} ${to}`);
       } else if (!jsonOut) {
-        log(`[dry-run] Would remove ${to}`);
+        log(t("link.dryRunRemove", lang, { path: to }));
       }
       removed.push({ to });
     }
@@ -288,20 +286,21 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
         break;
       }
     }
-    if (missing) {
-      if (!jsonOut && !quiet) log(t("link.buildingDist", lang));
-      await runBuildWithMode({
-        configPath,
-        outDirOverride: buildDirOverride,
-        mode: "copy",
-        quiet,
-        jsonOut,
-      });
-    }
+      if (missing) {
+        if (!jsonOut && !quiet) log(t("link.buildingDist", lang));
+        await runBuildWithMode({
+          configPath,
+          outDirOverride: buildDirOverride,
+          mode: "copy",
+          quiet,
+          jsonOut,
+          lang,
+        });
+      }
   }
   for (const { from } of sources) {
     if (!(await pathExists(from))) {
-      console.error(`Source path not found: ${from}`);
+      console.error(t("link.sourceNotFound", lang, { path: from }));
       process.exitCode = 1;
       return;
     }
@@ -324,7 +323,7 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
       action = replace ? "replace" : "skip";
     }
     if (existingType !== "none" && action === "skip") {
-      if (!jsonOut) log(`Skipped ${to} (already exists).`);
+      if (!jsonOut) log(t("link.skippedExists", lang, { path: to }));
       continue;
     }
     if (!dryRun) {
@@ -334,9 +333,9 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
       }
       const linkType = mode === "junction" ? "junction" : "dir";
       await symlink(from, to, linkType);
-      if (!jsonOut) log(`Linked ${from} -> ${to}`);
+      if (!jsonOut) log(t("link.linked", lang, { from, to }));
     } else if (!jsonOut) {
-      log(`[dry-run] Would link ${from} -> ${to}`);
+      log(t("link.dryRunLink", lang, { from, to }));
     }
     linked.push({ from, to });
   }

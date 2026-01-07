@@ -4,11 +4,11 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveConfigPath, resolveOutDir } from "../core/config.js";
-import type { CommandContext } from "../types.js";
+import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
 import { loadIgnoreRules, isIgnored } from "../utils/ignore.js";
-import { resolveLang } from "../utils/i18n.js";
+import { resolveLang, t } from "../utils/i18n.js";
 
 function shouldSkipTsScript(
   entryRel: string,
@@ -29,6 +29,7 @@ type BuildOptions = {
   mode: BuildMode;
   quiet?: boolean;
   jsonOut?: boolean;
+  lang?: Lang;
 };
 
 export async function handleBuild(ctx: CommandContext): Promise<void> {
@@ -42,7 +43,7 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
     undefined;
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
-    console.error("Config selection cancelled.");
+    console.error(t("common.configSelectionCancelled", lang));
     process.exitCode = 1;
     return;
   }
@@ -52,15 +53,17 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
     mode: "copy",
     quiet,
     jsonOut,
+    lang,
   });
 }
 
 export async function runBuildWithMode(options: BuildOptions): Promise<void> {
   const { configPath, outDirOverride, mode, quiet, jsonOut } = options;
+  const resolvedLang = options.lang ?? resolveLang();
   const { info: log } = createLogger({ json: jsonOut, quiet });
 
   if (!(await pathExists(configPath))) {
-    console.error(`Config not found: ${configPath}`);
+    console.error(t("common.configNotFound", resolvedLang, { path: configPath }));
     process.exitCode = 1;
     return;
   }
@@ -84,7 +87,7 @@ export async function runBuildWithMode(options: BuildOptions): Promise<void> {
   // ESLint (if script present)
   if (behaviorEnabled && scriptConfig) {
     try {
-      await runEslint(rootDir, Boolean(quiet || jsonOut));
+      await runEslint(rootDir, Boolean(quiet || jsonOut), resolvedLang);
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;
@@ -103,7 +106,7 @@ export async function runBuildWithMode(options: BuildOptions): Promise<void> {
       scriptEntryRel.replace(/\.ts$/, ".js"),
     );
     await ensureDir(dirname(outFile));
-    const bundleTask = await getBundleTask();
+    const bundleTask = await getBundleTask(resolvedLang);
     const externals =
       scriptConfig.dependencies
         ?.filter(
@@ -118,7 +121,7 @@ export async function runBuildWithMode(options: BuildOptions): Promise<void> {
       external: externals,
       minifyWhitespace: false,
     });
-    log(`Bundling script: ${entryAbs} -> ${outFile}`);
+    log(t("build.bundling", resolvedLang, { entry: entryAbs, out: outFile }));
     await runTask(bundle);
   }
 
@@ -182,7 +185,7 @@ export async function runBuildWithMode(options: BuildOptions): Promise<void> {
 
   const outStat = await stat(outDir);
   if (!outStat.isDirectory()) {
-    console.error(`Build output is not a directory: ${outDir}`);
+    console.error(t("build.outputNotDir", resolvedLang, { path: outDir }));
     process.exitCode = 1;
     return;
   }
@@ -190,7 +193,7 @@ export async function runBuildWithMode(options: BuildOptions): Promise<void> {
   if (jsonOut) {
     console.log(JSON.stringify({ ok: true, outDir, mode }, null, 2));
   } else {
-    log(`Build completed (${mode}) -> ${outDir}`);
+    log(t("build.completed", resolvedLang, { mode, outDir }));
   }
 }
 
@@ -254,14 +257,16 @@ type ScriptBuildOptions = {
   outDirOverride?: string;
   quiet?: boolean;
   jsonOut?: boolean;
+  lang?: Lang;
 };
 
 export async function runScriptBuildOnly(options: ScriptBuildOptions): Promise<void> {
-  const { configPath, outDirOverride, quiet, jsonOut } = options;
+  const { configPath, outDirOverride, quiet, jsonOut, lang } = options;
   const { info: log } = createLogger({ json: jsonOut, quiet });
+  const resolvedLang = lang ?? "ja";
 
   if (!(await pathExists(configPath))) {
-    console.error(`Config not found: ${configPath}`);
+    console.error(t("common.configNotFound", resolvedLang, { path: configPath }));
     process.exitCode = 1;
     return;
   }
@@ -289,7 +294,7 @@ export async function runScriptBuildOnly(options: ScriptBuildOptions): Promise<v
   const scriptsOutDir = resolve(behaviorDest, "scripts");
 
   try {
-    await runEslint(rootDir, Boolean(quiet || jsonOut));
+    await runEslint(rootDir, Boolean(quiet || jsonOut), resolvedLang);
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     process.exitCode = 1;
@@ -304,7 +309,7 @@ export async function runScriptBuildOnly(options: ScriptBuildOptions): Promise<v
     scriptEntryRel.replace(/\.ts$/, ".js"),
   );
   await ensureDir(dirname(outFile));
-  const bundleTask = await getBundleTask();
+  const bundleTask = await getBundleTask(resolvedLang);
   const externals =
     scriptConfig.dependencies
       ?.filter(
@@ -319,14 +324,14 @@ export async function runScriptBuildOnly(options: ScriptBuildOptions): Promise<v
     external: externals,
     minifyWhitespace: false,
   });
-  log(`Bundling script: ${entryAbs} -> ${outFile}`);
+  log(t("build.bundling", resolvedLang, { entry: entryAbs, out: outFile }));
   await runTask(bundle);
 
   // Keep ignore rules loaded to match build behavior, even though we only emit scripts.
   void ignoreRules;
 }
 
-async function getBundleTask(): Promise<
+async function getBundleTask(lang: Lang): Promise<
   (options: {
     entryPoint: string;
     outfile: string;
@@ -338,7 +343,9 @@ async function getBundleTask(): Promise<
   const require = createRequire(import.meta.url);
   const coreBuild = require("@minecraft/core-build-tasks");
   const task = (coreBuild as any).bundleTask;
-  if (!task) throw new Error("bundleTask not found in @minecraft/core-build-tasks");
+  if (!task) {
+    throw new Error(t("build.bundleTaskMissing", lang));
+  }
   return task;
 }
 
@@ -355,10 +362,10 @@ function runTask(task: (done: (err?: unknown) => void) => unknown): Promise<void
   });
 }
 
-async function runEslint(rootDir: string, quiet: boolean): Promise<void> {
+async function runEslint(rootDir: string, quiet: boolean, lang: Lang): Promise<void> {
   const eslintPath = resolve(rootDir, "node_modules/.bin/eslint");
   if (!(await pathExists(eslintPath))) {
-    throw new Error("eslint not found in project. Run npm install.");
+    throw new Error(t("build.eslintMissing", lang));
   }
   const args = ["packs/behavior/scripts/**/*.{ts,js}"];
   const useShell = process.platform === "win32";
@@ -371,7 +378,7 @@ async function runEslint(rootDir: string, quiet: boolean): Promise<void> {
     child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`eslint exited with code ${code}`));
+      else reject(new Error(t("build.eslintExit", lang, { code: String(code) })));
     });
   });
 }

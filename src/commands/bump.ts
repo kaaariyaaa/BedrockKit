@@ -44,13 +44,13 @@ export async function handleBump(ctx: CommandContext): Promise<void> {
 
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
-    console.error("Config selection cancelled.");
+    console.error(t("common.configSelectionCancelled", lang));
     process.exitCode = 1;
     return;
   }
 
   if (!(await pathExists(configPath))) {
-    console.error(`Config not found: ${configPath}`);
+    console.error(t("common.configNotFound", lang, { path: configPath }));
     process.exitCode = 1;
     return;
   }
@@ -143,12 +143,12 @@ export async function handleBump(ctx: CommandContext): Promise<void> {
     : resolve(rootDir, config.packs.resource, "manifest.json");
 
   if (!(await pathExists(behaviorManifestPath))) {
-    console.error(`Behavior manifest not found: ${behaviorManifestPath}`);
+    console.error(t("bump.behaviorManifestMissing", lang, { path: behaviorManifestPath }));
     process.exitCode = 1;
     return;
   }
   if (!(await pathExists(resourceManifestPath))) {
-    console.error(`Resource manifest not found: ${resourceManifestPath}`);
+    console.error(t("bump.resourceManifestMissing", lang, { path: resourceManifestPath }));
     process.exitCode = 1;
     return;
   }

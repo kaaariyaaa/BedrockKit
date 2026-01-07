@@ -1,31 +1,33 @@
 import pc from "picocolors";
 import type { Command } from "./types.js";
+import type { Lang } from "./types.js";
+import { t } from "./utils/i18n.js";
 
-export function printHelp(commands: Command[]): void {
+export function printHelp(commands: Command[], lang: Lang): void {
   const lines = [
-    pc.bold(pc.cyan("BedrockKit CLI")),
+    pc.bold(pc.cyan(t("help.title", lang))),
     "",
-    pc.bold("Usage:"),
-    `  ${pc.green("bkit")} <command> [...args]`,
-    `  ${pc.green("bkit")} -i|--interactive`,
+    pc.bold(t("help.usage", lang)),
+    `  ${pc.green("bkit")} ${t("help.usageCommand", lang)}`,
+    `  ${pc.green("bkit")} ${t("help.usageInteractive", lang)}`,
     "",
-    pc.bold("Commands:"),
+    pc.bold(t("help.commands", lang)),
     ...commands.map((cmd) => {
       const alias = cmd.aliases?.length ? pc.dim(` (${cmd.aliases.join(", ")})`) : "";
       return `  ${pc.cyan(cmd.name)}${alias.padEnd(12 - cmd.name.length)} ${cmd.description}`;
     }),
     "",
-    pc.bold("Flags:"),
-    `  ${pc.yellow("-h, --help")}          Show help`,
-    `  ${pc.yellow("-v, --version")}       Show version`,
-    `  ${pc.yellow("-i, --interactive")}   Launch arrow-key menu`,
-    `  ${pc.yellow("--json")}              Machine-readable output (build/package/sync/validate)`,
-    `  ${pc.yellow("-q, --quiet")}         Suppress non-error logs (build/package/sync/validate)`,
-    `  ${pc.yellow("--build=false")}       Skip pre-build for sync/package (default: true)`,
+    pc.bold(t("help.flags", lang)),
+    `  ${pc.yellow("-h, --help")}          ${t("help.flag.help", lang)}`,
+    `  ${pc.yellow("-v, --version")}       ${t("help.flag.version", lang)}`,
+    `  ${pc.yellow("-i, --interactive")}   ${t("help.flag.interactive", lang)}`,
+    `  ${pc.yellow("--json")}              ${t("help.flag.json", lang)}`,
+    `  ${pc.yellow("-q, --quiet")}         ${t("help.flag.quiet", lang)}`,
+    `  ${pc.yellow("--build=false")}       ${t("help.flag.build", lang)}`,
     "",
-    pc.bold(".bkitignore:"),
-    "  Supports simple patterns with * wildcard and # comments.",
-    "  Example:",
+    pc.bold(t("help.bkitignore", lang)),
+    `  ${t("help.bkitignoreDesc", lang)}`,
+    `  ${t("help.bkitignoreExample", lang)}`,
     pc.dim("    dist/"),
     pc.dim("    node_modules/"),
     pc.dim("    *.log"),

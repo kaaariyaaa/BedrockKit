@@ -6,10 +6,10 @@ import {
   resolveConfigPath,
   validateConfig,
 } from "../core/config.js";
-import type { CommandContext } from "../types.js";
+import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
-import { resolveLang } from "../utils/i18n.js";
+import { resolveLang, t } from "../utils/i18n.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -26,8 +26,8 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
 
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
-    issues.push("Config selection cancelled.");
-    report(issues, { json: jsonOut, configPath: configPath ?? undefined });
+    issues.push(t("common.configSelectionCancelled", lang));
+    report(issues, lang, { json: jsonOut, configPath: configPath ?? undefined });
     return;
   }
 
@@ -36,12 +36,14 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
     configCtx = await loadConfigContext(configPath);
   } catch (err) {
     issues.push(
-      err instanceof Error ? err.message : `Failed to load config: ${String(err)}`,
+      t("validate.loadConfigFailed", lang, {
+        error: err instanceof Error ? err.message : String(err),
+      }),
     );
   }
 
   if (!configCtx) {
-    report(issues, { json: jsonOut, configPath });
+    report(issues, lang, { json: jsonOut, configPath });
     return;
   }
 
@@ -59,10 +61,14 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
   const behaviorExists = behaviorManifestPath ? await pathExists(behaviorManifestPath) : false;
   const resourceExists = resourceManifestPath ? await pathExists(resourceManifestPath) : false;
   if (configCtx.behavior.enabled && !behaviorExists && behaviorManifestPath) {
-    issues.push(`Missing behavior manifest at ${behaviorManifestPath}`);
+    issues.push(
+      t("validate.missingBehaviorManifest", lang, { path: behaviorManifestPath }),
+    );
   }
   if (configCtx.resource.enabled && !resourceExists && resourceManifestPath) {
-    issues.push(`Missing resource manifest at ${resourceManifestPath}`);
+    issues.push(
+      t("validate.missingResourceManifest", lang, { path: resourceManifestPath }),
+    );
   }
 
   let behaviorManifest: Manifest | undefined;
@@ -72,9 +78,9 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
       behaviorManifest = await readManifest(behaviorManifestPath);
     } catch (err) {
       issues.push(
-        `Failed to parse behavior manifest: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        t("validate.parseBehaviorManifestFailed", lang, {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       );
     }
   }
@@ -83,9 +89,9 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
       resourceManifest = await readManifest(resourceManifestPath);
     } catch (err) {
       issues.push(
-        `Failed to parse resource manifest: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        t("validate.parseResourceManifestFailed", lang, {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       );
     }
   }
@@ -93,8 +99,8 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
   const uuidSet = new Set<string>();
 
   if (behaviorManifest && resourceManifest) {
-    issues.push(...validateManifestShape(behaviorManifest, "behavior", uuidSet));
-    issues.push(...validateManifestShape(resourceManifest, "resource", uuidSet));
+    issues.push(...validateManifestShape(behaviorManifest, "behavior", uuidSet, lang));
+    issues.push(...validateManifestShape(resourceManifest, "resource", uuidSet, lang));
 
     const behaviorDependsOnResource = (behaviorManifest.dependencies ?? []).some(
       (dep) => "uuid" in dep && dep.uuid === resourceManifest!.header.uuid,
@@ -103,16 +109,16 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
       (dep) => "uuid" in dep && dep.uuid === behaviorManifest!.header.uuid,
     );
     if (!behaviorDependsOnResource)
-      issues.push("Behavior pack manifest missing dependency on resource pack");
+      issues.push(t("validate.behaviorMissingResourceDep", lang));
     if (!resourceDependsOnBehavior)
-      issues.push("Resource pack manifest missing dependency on behavior pack");
+      issues.push(t("validate.resourceMissingBehaviorDep", lang));
 
     if (config.script) {
       const hasScriptModule = behaviorManifest.modules.some(
         (m) => m.type === "script",
       );
       if (!hasScriptModule) {
-        issues.push("Behavior pack missing script module while config.script is defined");
+        issues.push(t("validate.behaviorMissingScriptModule", lang));
       }
 
       const manifestScriptDeps = (behaviorManifest.dependencies ?? []).filter(
@@ -131,9 +137,9 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
       });
       if (missingDeps.length) {
         issues.push(
-          `Behavior manifest missing script dependencies: ${missingDeps
-            .map((d) => d.module_name)
-            .join(", ")}`,
+          t("validate.missingScriptDeps", lang, {
+            deps: missingDeps.map((d) => d.module_name).join(", "),
+          }),
         );
       }
     }
@@ -141,27 +147,32 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
 
   if (strict && behaviorManifest) {
     if (!behaviorManifest.header.min_engine_version)
-      issues.push("Behavior manifest missing min_engine_version");
+      issues.push(t("validate.behaviorMissingMinEngine", lang));
     if (!behaviorManifest.header.description)
-      issues.push("Behavior manifest missing description");
+      issues.push(t("validate.behaviorMissingDescription", lang));
   }
   if (strict && resourceManifest) {
     if (!resourceManifest.header.min_engine_version)
-      issues.push("Resource manifest missing min_engine_version");
+      issues.push(t("validate.resourceMissingMinEngine", lang));
     if (!resourceManifest.header.description)
-      issues.push("Resource manifest missing description");
+      issues.push(t("validate.resourceMissingDescription", lang));
   }
 
-  report(issues, { json: jsonOut, configPath });
+  report(issues, lang, { json: jsonOut, configPath });
 }
 
-function validateVersionTuple(tuple: unknown, context: string, issues: string[]): void {
+function validateVersionTuple(
+  tuple: unknown,
+  context: string,
+  issues: string[],
+  lang: Lang,
+): void {
   if (
     !Array.isArray(tuple) ||
     tuple.length !== 3 ||
     !tuple.every((n) => Number.isInteger(n) && n >= 0)
   ) {
-    issues.push(`${context} version must be a tuple of three non-negative integers`);
+    issues.push(t("validate.versionTuple", lang, { context }));
   }
 }
 
@@ -169,42 +180,59 @@ function validateManifestShape(
   manifest: Manifest,
   kind: "behavior" | "resource",
   seenUuids: Set<string>,
+  lang: Lang,
 ): string[] {
   const issues: string[] = [];
   if (manifest.format_version !== 2) {
-    issues.push(`${kind} manifest format_version should be 2`);
+    issues.push(t("validate.formatVersion", lang, { kind }));
   }
   if (!manifest.header?.uuid) {
-    issues.push(`${kind} manifest header.uuid is missing`);
+    issues.push(t("validate.headerUuidMissing", lang, { kind }));
   } else if (seenUuids.has(manifest.header.uuid)) {
-    issues.push(`${kind} manifest header.uuid duplicates another UUID`);
+    issues.push(t("validate.headerUuidDuplicate", lang, { kind }));
   } else {
     seenUuids.add(manifest.header.uuid);
   }
-  validateVersionTuple(manifest.header?.version, `${kind} manifest header`, issues);
+  validateVersionTuple(
+    manifest.header?.version,
+    t("validate.context.header", lang, { kind }),
+    issues,
+    lang,
+  );
   validateVersionTuple(
     manifest.header?.min_engine_version,
-    `${kind} manifest header.min_engine_version`,
+    t("validate.context.minEngine", lang, { kind }),
     issues,
+    lang,
   );
   if (!manifest.modules || !manifest.modules.length) {
-    issues.push(`${kind} manifest modules are missing`);
+    issues.push(t("validate.modulesMissing", lang, { kind }));
   } else {
     for (const mod of manifest.modules) {
       if (!mod.uuid) {
-        issues.push(`${kind} manifest module missing uuid`);
+        issues.push(t("validate.moduleUuidMissing", lang, { kind }));
       } else if (seenUuids.has(mod.uuid)) {
-        issues.push(`${kind} manifest module uuid duplicates another UUID`);
+        issues.push(t("validate.moduleUuidDuplicate", lang, { kind }));
       } else {
         seenUuids.add(mod.uuid);
       }
-      validateVersionTuple(mod.version, `${kind} manifest module`, issues);
+      validateVersionTuple(
+        mod.version,
+        t("validate.context.module", lang, { kind }),
+        issues,
+        lang,
+      );
       if (
         mod.type !== "data" &&
         mod.type !== "resources" &&
         mod.type !== "script"
       ) {
-        issues.push(`${kind} manifest module type '${(mod as any).type}' is invalid`);
+        issues.push(
+          t("validate.moduleTypeInvalid", lang, {
+            kind,
+            type: (mod as any).type,
+          }),
+        );
       }
     }
   }
@@ -213,6 +241,7 @@ function validateManifestShape(
 
 function report(
   issues: string[],
+  lang: Lang,
   opts: { json?: boolean; configPath?: string } = {},
 ): void {
   if (opts.json) {
@@ -231,10 +260,10 @@ function report(
     return;
   }
   if (!issues.length) {
-    console.log("Validation passed.");
+    console.log(t("validate.passed", resolveLang(lang)));
     return;
   }
-  console.error("Validation issues:");
+  console.error(t("validate.issues", resolveLang(lang)));
   issues.forEach((i) => console.error(`- ${i}`));
   process.exitCode = 1;
 }

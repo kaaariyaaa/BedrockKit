@@ -32,6 +32,7 @@ import type {
   ScriptApiSelection,
   ScriptApiVersionMap,
   ScriptLanguage,
+  Lang,
 } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, isDirEmpty, writeJson } from "../utils/fs.js";
@@ -203,11 +204,11 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     const installChoice = await select({
       message: t("init.installDeps", lang),
       options: [
-        { value: "npm-install", label: "npm install" },
-        { value: "npm-ci", label: "npm ci" },
-        { value: "pnpm-install", label: "pnpm install" },
-        { value: "yarn-install", label: "yarn install" },
-        { value: "skip", label: "Skip" },
+        { value: "npm-install", label: t("init.installOption.npmInstall", lang) },
+        { value: "npm-ci", label: t("init.installOption.npmCi", lang) },
+        { value: "pnpm-install", label: t("init.installOption.pnpmInstall", lang) },
+        { value: "yarn-install", label: t("init.installOption.yarnInstall", lang) },
+        { value: "skip", label: t("init.installOption.skip", lang) },
       ],
       initialValue: "npm-install",
     });
@@ -225,7 +226,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
 
   if (!force && !isDirEmpty(targetDir)) {
     log.error(
-      `Target directory ${targetDir} is not empty. Use --force to initialize anyway.`,
+      t("init.targetNotEmpty", lang, { path: targetDir }),
     );
     process.exitCode = 1;
     return;
@@ -235,7 +236,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
   
   // Note: We don't verify if we are in interactive mode to clear screen, 
   // but let's just make the intro nice.
-  intro(pc.inverse(" BedrockKit Init "));
+  intro(pc.inverse(t("init.title", lang)));
   
   const spin = spinner();
   spin.start(t("init.generating", lang));
@@ -316,7 +317,7 @@ export async function handleInit(ctx: CommandContext): Promise<void> {
     let templatePath: string | null = null;
     if (template === "custom-git" && !templateArg && !nonInteractive) {
       const gitUrl = await text({
-        message: "Enter Git URL for template",
+        message: t("init.templateUrlPrompt", lang),
         validate: (v) => (!v.trim() ? t("common.required", lang) : undefined),
       });
       if (isCancel(gitUrl)) {
@@ -375,12 +376,12 @@ ${eslintRules
       await writeFile(scriptPath, defaultScript, { encoding: "utf8" });
       await writeJson(
         resolve(targetDir, "package.json"),
-        buildPackageJson(targetName, scriptApiVersion, scriptApiVersions, scriptApiSelection),
+        buildPackageJson(targetName, scriptApiVersion, scriptApiVersions, scriptApiSelection, lang),
       );
       await writeJson(resolve(targetDir, "tsconfig.json"), buildTsConfig(scriptEntry));
     }
   } catch (err) {
-    spin.stop("Failed to write files");
+    spin.stop(t("init.writeFailed", lang));
     throw err;
   }
 
@@ -391,7 +392,7 @@ ${eslintRules
     installSpin.start(`${t("init.installingDeps", lang)} (${installCommandLabel})`);
     try {
       await runInstall(targetDir, installCommandLabel);
-      installSpin.stop("Dependencies installed");
+      installSpin.stop(t("init.installCompleted", lang));
       installStatus = "completed";
     } catch (err) {
       installSpin.stop(t("init.installFailed", lang));
@@ -399,26 +400,31 @@ ${eslintRules
       installStatus = "failed";
     }
   } else if (includeScript) {
-    log.info("Skipped dependency install (use --skip-install to control this).");
+    log.info(t("init.installSkipped", lang));
   }
 
   outro(
     [
-      `Created workspace at ${targetDir}`,
-      `- behavior pack manifest: packs/behavior/manifest.json`,
-      `- resource pack manifest: packs/resource/manifest.json`,
-      `- config: bkit.config.json`,
+      t("init.summary.created", lang, { path: targetDir }),
+      t("init.summary.behaviorManifest", lang),
+      t("init.summary.resourceManifest", lang),
+      t("init.summary.config", lang),
       includeScript
-        ? `- script entry: ${scriptEntry} (language: ${scriptLanguage}, api: ${scriptApiVersion}, dependencies: ${buildScriptDependencies(scriptApiVersion, scriptApiSelection)
-            .map((d) => d.module_name)
-            .join(", ")})`
+        ? t("init.summary.scriptEntry", lang, {
+            entry: scriptEntry,
+            language: String(scriptLanguage ?? "javascript"),
+            api: scriptApiVersion,
+            deps: buildScriptDependencies(scriptApiVersion, scriptApiSelection)
+              .map((d) => d.module_name)
+              .join(", "),
+          })
         : "",
       includeScript
         ? installStatus === "completed"
-          ? `- ${installCommandLabel} completed`
+          ? t("init.summary.installCompleted", lang, { command: installCommandLabel })
           : installStatus === "skipped"
-            ? `- ${installCommandLabel} skipped`
-            : `- ${installCommandLabel} failed (see log above)`
+            ? t("init.summary.installSkipped", lang, { command: installCommandLabel })
+            : t("init.summary.installFailed", lang, { command: installCommandLabel })
         : "",
     ]
       .filter(Boolean)
@@ -431,13 +437,14 @@ function buildPackageJson(
   scriptApiVersion: string,
   scriptApiVersions: ScriptApiVersionMap,
   selection: ScriptApiSelection,
+  lang: Lang,
 ) {
   return {
     name,
     version: "1.0.0",
     private: true,
     type: "module",
-    description: "BedrockKit addon project",
+    description: t("init.packageDescription", lang),
     dependencies: {
       "@minecraft/server": selection.server ? scriptApiVersions.server ?? scriptApiVersion : undefined,
       "@minecraft/server-ui": selection.serverUi

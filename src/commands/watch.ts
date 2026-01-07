@@ -241,20 +241,20 @@ async function syncLinkMode(
   const buildDir = resolveOutDir(configCtx, outDirOverride);
   const targetName = await pickTargetName(configCtx, lang, true);
   if (!targetName) {
-    throw new Error("No sync target selected.");
+    throw new Error(t("watch.noSyncTargetSelected", lang));
   }
   const targets = config.sync?.targets ?? {};
   const targetConfig = targets[targetName] as SyncTargetConfig | undefined;
   if (!targetConfig) {
-    throw new Error(`Sync target not found: ${targetName}`);
+    throw new Error(t("watch.syncTargetNotFound", lang, { target: targetName }));
   }
   const projectName = targetConfig.projectName ?? config.project.name;
   const targetPaths = resolveTargetPaths(targetConfig, projectName);
   if (configCtx.behavior.enabled && !targetPaths.behavior) {
-    throw new Error(`Target '${targetName}' missing behavior path in sync.targets`);
+    throw new Error(t("watch.targetMissingBehavior", lang, { target: targetName }));
   }
   if (configCtx.resource.enabled && !targetPaths.resource) {
-    throw new Error(`Target '${targetName}' missing resource path in sync.targets`);
+    throw new Error(t("watch.targetMissingResource", lang, { target: targetName }));
   }
 
   if (configCtx.behavior.enabled && configCtx.behavior.path && targetPaths.behavior) {
@@ -295,12 +295,12 @@ async function removeLinkTargets(
   const { config } = configCtx;
   const targetName = await pickTargetName(configCtx, lang, false);
   if (!targetName) {
-    throw new Error("No sync target selected.");
+    throw new Error(t("watch.noSyncTargetSelected", lang));
   }
   const targets = config.sync?.targets ?? {};
   const targetConfig = targets[targetName] as SyncTargetConfig | undefined;
   if (!targetConfig) {
-    throw new Error(`Sync target not found: ${targetName}`);
+    throw new Error(t("watch.syncTargetNotFound", lang, { target: targetName }));
   }
   const projectName = targetConfig.projectName ?? config.project.name;
   const targetPaths = resolveTargetPaths(targetConfig, projectName);
@@ -327,12 +327,12 @@ async function finalizeSyncCopy(
   const { config } = configCtx;
   const targetName = await pickTargetName(configCtx, lang, false);
   if (!targetName) {
-    throw new Error("No sync target selected.");
+    throw new Error(t("watch.noSyncTargetSelected", lang));
   }
   const targets = config.sync?.targets ?? {};
   const targetConfig = targets[targetName] as SyncTargetConfig | undefined;
   if (!targetConfig) {
-    throw new Error(`Sync target not found: ${targetName}`);
+    throw new Error(t("watch.syncTargetNotFound", lang, { target: targetName }));
   }
   const projectName = targetConfig.projectName ?? config.project.name;
   const targetPaths = resolveTargetPaths(targetConfig, projectName);
@@ -357,7 +357,10 @@ async function finalizeWatchBuilds(
         await removeLinkTargets(configCtx, lang);
       } catch (err) {
         console.error(
-          `[${proj.name}] finalize unlink failed: ${err instanceof Error ? err.message : err}`,
+          t("watch.finalizeUnlinkFailed", lang, {
+            name: proj.name,
+            error: err instanceof Error ? err.message : String(err),
+          }),
         );
         throw err;
       }
@@ -365,13 +368,19 @@ async function finalizeWatchBuilds(
         await finalizeSyncCopy(configCtx, outDir, lang);
       } catch (err) {
         console.error(
-          `[${proj.name}] finalize sync step failed: ${err instanceof Error ? err.message : err}`,
+          t("watch.finalizeSyncFailed", lang, {
+            name: proj.name,
+            error: err instanceof Error ? err.message : String(err),
+          }),
         );
         throw err;
       }
     } catch (err) {
       console.error(
-        `[${proj.name}] finalize build failed: ${err instanceof Error ? err.message : err}`,
+        t("watch.finalizeFailed", lang, {
+          name: proj.name,
+          error: err instanceof Error ? err.message : String(err),
+        }),
       );
     }
   }
@@ -391,11 +400,13 @@ async function recoverFromWatchState(
       return;
     }
     const outDir = state.outDir || defaultOutDir;
-    log("Detected leftover watch link state. Finalizing build outputs...");
+    log(t("watch.recoverNotice", lang));
     await finalizeWatchBuilds(state.projects, outDir, lang);
   } catch (err) {
     console.error(
-      `Failed to recover watch state: ${err instanceof Error ? err.message : err}`,
+      t("watch.recoverFailed", lang, {
+        error: err instanceof Error ? err.message : String(err),
+      }),
     );
   } finally {
     await removeWatchState();
@@ -417,7 +428,9 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   const settings = await loadSettings();
   const projects = await discoverProjects(process.cwd());
   if (!projects.length) {
-    console.error(`No projects found under ${resolveProjectRoot(settings)}`);
+    console.error(
+      t("watch.noProjectsFound", lang, { path: resolveProjectRoot(settings) }),
+    );
     return;
   }
 
@@ -443,7 +456,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
 
   const selectedProjects = projects.filter((p) => selected.includes(p.name));
   if (!selectedProjects.length) {
-    console.error("No projects selected.");
+    console.error(t("watch.noProjectsSelected", lang));
     return;
   }
 
@@ -476,7 +489,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     if (cleanupRequested) return;
     cleanupRequested = true;
     if (buildMode === "link") {
-      log("Finalizing build outputs (copy mode)...");
+      log(t("watch.finalizeNotice", lang));
       await finalizeWatchBuilds(selectedProjects, outDirOverride, lang);
       await removeWatchState();
     }
@@ -494,7 +507,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   }
 
   intro(t("watch.intro", lang));
-  log(`Using watch build outDir: ${outDirOverride} (mode: ${buildMode})`);
+  log(t("watch.outDir", lang, { outDir: outDirOverride, mode: buildMode }));
 
   for (const proj of selectedProjects) {
     const configCtx = await loadConfigContext(proj.configPath);
@@ -514,13 +527,16 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     const trigger = async (reason: string) => {
       if (pending) return;
       pending = true;
-      log(`[${proj.name}] change detected (${reason}), building...`);
+      log(
+        t("watch.changeDetected", lang, { name: proj.name, reason }),
+      );
       try {
         if (buildMode === "link") {
           await runScriptBuildOnly({
             configPath: proj.configPath,
             outDirOverride,
             quiet: true,
+            lang,
           });
         } else {
           await runBuildWithMode({
@@ -528,6 +544,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
             outDirOverride,
             mode: buildMode,
             quiet: true,
+            lang,
           });
         }
         if (buildMode === "link") {
@@ -546,11 +563,13 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
             ],
           });
         }
-        log(`[${proj.name}] build+sync completed.`);
+        log(t("watch.buildSyncCompleted", lang, { name: proj.name }));
       } catch (err) {
         console.error(
-          `[${proj.name}] build+sync failed:`,
-          err instanceof Error ? err.message : err,
+          t("watch.buildSyncFailed", lang, {
+            name: proj.name,
+            error: err instanceof Error ? err.message : String(err),
+          }),
         );
       } finally {
         pending = false;
@@ -559,6 +578,11 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     watcher.on("add", (p) => trigger(`add ${p}`));
     watcher.on("change", (p) => trigger(`change ${p}`));
     watcher.on("unlink", (p) => trigger(`unlink ${p}`));
-    log(`[${proj.name}] watching ${watchPaths.join(", ")}`);
+    log(
+      t("watch.watching", lang, {
+        name: proj.name,
+        paths: watchPaths.join(", "),
+      }),
+    );
   }
 }

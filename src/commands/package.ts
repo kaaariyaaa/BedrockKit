@@ -32,13 +32,13 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   }
   const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
   if (!configPath) {
-    console.error("Config selection cancelled.");
+    console.error(t("common.configSelectionCancelled", lang));
     process.exitCode = 1;
     return;
   }
 
   if (!(await pathExists(configPath))) {
-    console.error(`Config not found: ${configPath}`);
+    console.error(t("common.configNotFound", lang, { path: configPath }));
     process.exitCode = 1;
     return;
   }
@@ -48,7 +48,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   const buildDir = resolveOutDir(configCtx);
 
   if (shouldBuild) {
-    log("Running build before packaging...");
+    log(t("package.runBuildNow", lang));
     const forwardFlags = ["--config", configPath];
     if (jsonOut) forwardFlags.push("--json");
     if (quiet) forwardFlags.push("--quiet");
@@ -56,14 +56,14 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   }
 
   if (!(await pathExists(buildDir))) {
-    console.error(`Build directory not found: ${buildDir}`);
+    console.error(t("package.buildDirNotFound", lang, { path: buildDir }));
     process.exitCode = 1;
     return;
   }
 
   const stats = await stat(buildDir);
   if (!stats.isDirectory()) {
-    console.error(`Build path is not a directory: ${buildDir}`);
+    console.error(t("package.buildPathNotDir", lang, { path: buildDir }));
     process.exitCode = 1;
     return;
   }
@@ -76,11 +76,17 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   const resourceOut = resolve(buildDir, `${baseName}_resource.mcpack`);
 
   if (!jsonOut) {
-    log(`Packaging '${buildDir}' -> '${behaviorOut}', '${resourceOut}' ...`);
+    log(
+      t("package.packaging", lang, {
+        buildDir,
+        behaviorOut,
+        resourceOut,
+      }),
+    );
   }
   const produced: string[] = [];
   try {
-    const zipTask = await getZipTask();
+    const zipTask = await getZipTask(lang);
     const behaviorEnabled = configCtx.behavior.enabled;
     const resourceEnabled = configCtx.resource.enabled;
     const behaviorPath = behaviorEnabled ? resolve(buildDir, config.packs.behavior) : null;
@@ -91,7 +97,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [behaviorPath], targetPath: "" },
       ]);
       await runTask(behaviorTask);
-      if (!jsonOut) log(`Behavior pack created: ${behaviorOut}`);
+      if (!jsonOut) log(t("package.behaviorCreated", lang, { path: behaviorOut }));
       produced.push(behaviorOut);
     }
     if (resourceEnabled && resourcePath) {
@@ -99,7 +105,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [resourcePath], targetPath: "" },
       ]);
       await runTask(resourceTask);
-      if (!jsonOut) log(`Resource pack created: ${resourceOut}`);
+      if (!jsonOut) log(t("package.resourceCreated", lang, { path: resourceOut }));
       produced.push(resourceOut);
     }
 
@@ -111,7 +117,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
         { contents: [resourcePath], targetPath: "resource_pack" },
       ]);
       await runTask(addonTask);
-      if (!jsonOut) log(`Mcaddon created: ${addonOut}`);
+      if (!jsonOut) log(t("package.addonCreated", lang, { path: addonOut }));
       produced.push(addonOut);
     }
     if (jsonOut) {
@@ -119,7 +125,9 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
     }
   } catch (err) {
     console.error(
-      `Failed to create package: ${err instanceof Error ? err.message : String(err)}`,
+      t("package.failed", lang, {
+        error: err instanceof Error ? err.message : String(err),
+      }),
     );
     process.exitCode = 1;
   }
@@ -138,7 +146,7 @@ function runTask(task: (done: (err?: unknown) => void) => unknown): Promise<void
   });
 }
 
-async function getZipTask(): Promise<
+async function getZipTask(lang: string): Promise<
   (outputFile: string, contents: { contents: string[]; targetPath?: string }[]) => any
 > {
   // core-build-tasks exports CJS; use dynamic import to access zipTask property.
@@ -147,7 +155,7 @@ async function getZipTask(): Promise<
   const coreBuild = require("@minecraft/core-build-tasks");
   const task = (coreBuild as any).zipTask;
   if (!task) {
-    throw new Error("zipTask not found in @minecraft/core-build-tasks");
+    throw new Error(t("package.zipTaskMissing", resolveLang(lang)));
   }
   return task;
 }
