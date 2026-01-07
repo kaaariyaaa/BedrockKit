@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, isAbsolute } from "node:path";
+import { homedir } from "node:os";
 import { select, text, isCancel, intro, outro } from "@clack/prompts";
 import type { Lang } from "../types.js";
 import { resolveLang, t } from "./i18n.js";
@@ -21,7 +22,10 @@ export type Settings = {
   };
 };
 
-const settingsDir = resolve(process.cwd(), ".bkit");
+const userHome = process.env.USERPROFILE ?? homedir();
+const settingsDir = process.env.BKIT_SETTINGS_DIR
+  ? resolve(process.env.BKIT_SETTINGS_DIR)
+  : resolve(userHome, ".bkit");
 const settingsPath = resolve(settingsDir, "settings.json");
 
 export async function loadSettings(): Promise<Settings> {
@@ -104,7 +108,7 @@ export async function ensureSettings(langInput?: string | boolean): Promise<Sett
   intro(t("settings.setupTitle", resolveLang(langInput)));
 
   let lang = currentLang ?? resolveLang(langInput);
-  let projectRoot = currentRoot ?? resolve(process.cwd(), "project");
+  let projectRoot = currentRoot ?? resolve(userHome, "project");
   for (const key of order) {
     if (key === "lang" && needs.lang) {
       const picked = await promptLangSelection(langInput);
@@ -144,5 +148,5 @@ export function resolveProjectRoot(settings?: Settings): string {
       ? (settings as unknown as { projectRoot?: string }).projectRoot
       : undefined;
   const raw = settings?.projectRoot?.path ?? legacyRoot ?? "project";
-  return isAbsolute(raw) ? raw : resolve(process.cwd(), raw);
+  return isAbsolute(raw) ? raw : resolve(userHome, raw);
 }
