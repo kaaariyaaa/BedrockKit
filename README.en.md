@@ -83,18 +83,20 @@ Minimal example of `bkit.config.json`:
 ```
 
 ## Main Commands
-- `bkit init` (`new`) – Create a workspace from a template. You can interactively select Script API packages and versions. ESLint rules can be toggled interactively or via `--eslint-rules <csv>` / `--no-eslint` flags.
-- `bkit import <mcpack|mcaddon|zip>` – Extract an existing archive and generate `bkit.config.json` for workspace conversion. JS to TS conversion is optional (`--convert-ts`). Automatic conversion is recommended only when necessary due to compatibility risks.
-- `bkit build [--out-dir <dir>]` – Copy packs to `dist/`. If scripts are in TypeScript, they are bundled using `@minecraft/core-build-tasks`.
-- `bkit package [--out <name>]` – Create `.mcpack` (both packs) or `.mcaddon` (if both exist) from the `dist/` folder.
-- `bkit sync [--target <name>] [--build=false]` – Copy build outputs to locations defined in `config.sync.targets`. Specifying `product` allows deployment to Minecraft development environments.
-- `bkit deps` – Install selected Script API dependencies via npm and sync `bkit.config.json` and `manifest.json`.
-- `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` – Update project/manifest versions (optionally override min_engine_version).
-- `bkit validate [--strict] [--json]` – Check consistency between config and manifest files.
-- `bkit template <list|add|pull|rm>` – Manage the template registry (`.bkit/templates*.json`). Any repository can be registered as `custom-git`.
-- `bkit watch` – Watch the project folder and automatically perform build and sync on changes.
-- `bkit setting [--lang <ja|en>] [--project-root <path>]` – Manage CLI settings (language, project root). Prompts when no flags are provided.
-- `npm run build:local` / `npm run package:local` – Each generated/imported project ships with `tools/local-build.mjs` and `tools/local-package.mjs`. You can build and create `.mcpack/.mcaddon` archives without the BedrockKit CLI.
+- `bkit init` (`new`) : Create a workspace from a template. You can interactively select Script API packages and versions. ESLint rules can be toggled interactively or via `--eslint-rules <csv>` / `--no-eslint` flags.
+- `bkit import <mcpack|mcaddon|zip>` : Extract an existing archive and generate `bkit.config.json` for workspace conversion. JS to TS conversion is optional (`--convert-ts`). Automatic conversion is recommended only when necessary due to compatibility risks.
+- `bkit build [--out-dir <dir>]` : Copy packs to `dist/`. If scripts are in TypeScript, they are bundled using `@minecraft/core-build-tasks`.
+- `bkit package [--out <name>]` : Create `.mcpack` (both packs) or `.mcaddon` (if both exist) from the `dist/` folder.
+- `bkit sync [--target <name>] [--build=false]` : Copy build outputs to locations defined in `config.sync.targets`. Specifying `product` allows deployment to Minecraft development environments.
+- `bkit link [create|remove|edit]` : Create/remove/recreate symlinks in development folders. Supports `--source dist|packs`, `--mode symlink|junction`, and `--behavior/--resource`. If `dist` is missing it triggers a build.
+- `bkit deps` : Install selected Script API dependencies via npm and sync `bkit.config.json` and `manifest.json`.
+- `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` : Update project/manifest versions (optionally override min_engine_version).
+- `bkit validate [--strict] [--json]` : Check consistency between config and manifest files.
+- `bkit template <list|add|pull|rm>` : Manage the template registry (`.bkit/templates*.json`). Any repository can be registered as `custom-git`.
+- `bkit watch` : Watch the project folder and automatically perform build and sync on changes. Link mode shares non-script assets via symlink and copies built JS into `scripts`.
+- `bkit setting [--lang <ja|en>] [--project-root <path>]` : Manage CLI settings (language, project root). Prompts when no flags are provided.
+- `bkit remove [--project <name>]` : Remove a project folder (use `--yes` to skip confirmation). Use `bkit link remove` to unlink dev folders.
+- `npm run build:local` / `npm run package:local` : Each generated/imported project ships with `tools/local-build.mjs` and `tools/local-package.mjs`. You can build and create `.mcpack/.mcaddon` archives without the BedrockKit CLI.
 
 ## Sync Targets
 - **Via core-build-tasks** (Deploy to dev Minecraft)  

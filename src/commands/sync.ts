@@ -50,7 +50,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const resourceSrc = resourceEnabled ? resolve(buildDir, config.packs.resource) : null;
 
   if (shouldBuild && !dryRun) {
-    log("Running build before sync...");
+    log(t("sync.runBuildNow", lang));
     const forward: string[] = ["--config", configPath];
     if (jsonOut) forward.push("--json");
     if (quiet) forward.push("--quiet");
@@ -59,17 +59,21 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   }
 
   if (!(await pathExists(buildDir))) {
-    console.error(`Build output not found: ${buildDir}`);
+    console.error(t("sync.buildOutputNotFound", lang, { path: buildDir }));
     process.exitCode = 1;
     return;
   }
   if (behaviorEnabled && behaviorSrc && !(await pathExists(behaviorSrc))) {
-    console.error(`Behavior build output not found: ${behaviorSrc}. Run 'bkit build' first.`);
+    console.error(
+      t("sync.behaviorOutputNotFound", lang, { path: behaviorSrc }),
+    );
     process.exitCode = 1;
     return;
   }
   if (resourceEnabled && resourceSrc && !(await pathExists(resourceSrc))) {
-    console.error(`Resource build output not found: ${resourceSrc}. Run 'bkit build' first.`);
+    console.error(
+      t("sync.resourceOutputNotFound", lang, { path: resourceSrc }),
+    );
     process.exitCode = 1;
     return;
   }
@@ -77,9 +81,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   const targets = config.sync?.targets ?? {};
   const targetNames = Object.keys(targets);
   if (!targetNames.length) {
-    console.error(
-      "No sync targets defined in config.sync.targets. Add entries like { dev: { behavior: \"/path/to/development_behavior_packs/<name>\", resource: \"/path/to/development_resource_packs/<name>\" } }",
-    );
+    console.error(t("sync.noTargets", lang));
     process.exitCode = 1;
     return;
   }
@@ -111,7 +113,10 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     if (dryRun) {
       if (!jsonOut) {
         log(
-          `[dry-run] Would deploy via core-build-tasks to ${targetConfig.product} as ${projectName}`,
+          t("sync.dryRunProduct", lang, {
+            product: targetConfig.product,
+            project: projectName,
+          }),
         );
       } else {
         synced.push({ from: buildDir, product: targetConfig.product, projectName });
@@ -127,7 +132,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
       | ((params: CopyTaskParameters) => () => void)
       | undefined;
     if (!copyTask) {
-      console.error("copyTask not found in @minecraft/core-build-tasks");
+      console.error(t("sync.copyTaskMissing", lang));
       process.exitCode = 1;
       return;
     }
@@ -138,10 +143,17 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     };
     try {
       await Promise.resolve(copyTask(params)());
-      log(`Synced via core-build-tasks to ${targetConfig.product} (project: ${projectName})`);
+      log(
+        t("sync.syncedProduct", lang, {
+          product: targetConfig.product,
+          project: projectName,
+        }),
+      );
     } catch (err) {
       console.error(
-        `Sync failed: ${err instanceof Error ? err.message : String(err)}`,
+        t("sync.failed", lang, {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       );
       process.exitCode = 1;
     }
@@ -154,12 +166,12 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
 
   // Path-based sync (previous behavior)
   if (behaviorEnabled && !targetConfig?.behavior) {
-    console.error(`Target '${targetName}' missing behavior path in sync.targets`);
+    console.error(t("sync.targetMissingBehavior", lang, { target: targetName }));
     process.exitCode = 1;
     return;
   }
   if (resourceEnabled && !targetConfig?.resource) {
-    console.error(`Target '${targetName}' missing resource path in sync.targets`);
+    console.error(t("sync.targetMissingResource", lang, { target: targetName }));
     process.exitCode = 1;
     return;
   }
@@ -171,7 +183,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
   for (const { from, to } of tasks) {
     if (dryRun) {
       if (!jsonOut) {
-        log(`[dry-run] Would sync ${from} -> ${to}`);
+        log(t("sync.dryRunSync", lang, { from, to }));
       }
       synced.push({ from, to });
       continue;
@@ -179,7 +191,7 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     await ensureDir(dirname(to));
     await rm(to, { recursive: true, force: true });
     await cp(from, to, { recursive: true, force: true });
-    if (!jsonOut) log(`Synced ${from} -> ${to}`);
+    if (!jsonOut) log(t("sync.synced", lang, { from, to }));
     synced.push({ from, to });
   }
   if (jsonOut) {

@@ -1,6 +1,6 @@
 {
   "name": "@bedrockkit/cli",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "BedrockKit CLI for Bedrock addon/resource pack workflows",
   "type": "module",
   "bin": {
@@ -24,7 +24,7 @@
     "dev": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.json",
     "lint": "echo \"(todo) add lint\"",
-    "test": "echo \"(todo) add tests\""
+    "test": "npm run build && node --test"
   },
   "keywords": [
     "minecraft",

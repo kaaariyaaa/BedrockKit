@@ -83,18 +83,20 @@ project/<addon-name>/
 ```
 
 ## 主なコマンド
-- `bkit init` (`new`) – テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。ESLint ルールは有効/無効を対話選択でき、フラグ `--eslint-rules <csv>` / `--no-eslint` でも指定可能。
-- `bkit import <mcpack|mcaddon|zip>` – 既存アーカイブを展開し、`bkit.config.json` を生成してワークスペース化。JS→TS 変換はオプション（`--convert-ts`）。自動変換は互換性リスクがあるため、必要な場合のみ利用を推奨します。
-- `bkit build [--out-dir <dir>]` – ビヘイビア/リソースパックを `dist/` にコピー。スクリプトが TypeScript の場合は `@minecraft/core-build-tasks` でバンドルを実行。
-- `bkit package [--out <name>]` – `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。
-- `bkit sync [--target <name>] [--build=false]` – ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` 指定で Minecraft 開発環境へデプロイ。
-- `bkit deps` – 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `manifest.json` を同期。
-- `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` – プロジェクト/マニフェストのバージョンを更新（任意で min_engine_version も上書き）。
-- `bkit validate [--strict] [--json]` – config / manifest の整合性チェック。
-- `bkit template <list|add|pull|rm>` – テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意のリポジトリを登録可能。
-- `bkit watch` – `./project/<name>` 配下を監視し、変更ごとにビルドと同期を自動実行。
-- `bkit setting [--lang <ja|en>] [--project-root <path>]` – CLI 設定を変更（言語/プロジェクト保存先）。フラグ未指定時は対話で選択。
-- `npm run build:local` / `npm run package:local` – 生成/インポートされた各プロジェクトには `tools/local-build.mjs` と `tools/local-package.mjs` を同梱。BedrockKit CLI がなくても、プロジェクト単体でビルド＆.mcpack/.mcaddon パッケージ化が可能です。
+- `bkit init` (`new`) : テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。ESLint ルールは有効/無効を対話選択でき、フラグ `--eslint-rules <csv>` / `--no-eslint` でも指定可能。
+- `bkit import <mcpack|mcaddon|zip>` : 既存アーカイブを展開し、`bkit.config.json` を生成してワークスペース化。JS→TS 変換はオプション（`--convert-ts`）。自動変換は互換性リスクがあるため、必要な場合のみ利用を推奨します。
+- `bkit build [--out-dir <dir>]` : ビヘイビア/リソースパックを `dist/` にコピー。スクリプトが TypeScript の場合は `@minecraft/core-build-tasks` でバンドルを実行。
+- `bkit package [--out <name>]` : `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。
+- `bkit sync [--target <name>] [--build=false]` : ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` 指定で Minecraft 開発環境へデプロイ。
+- `bkit link [create|remove|edit]` : 開発フォルダへシンボリックリンクを作成/解除/再作成。`--source dist|packs`、`--mode symlink|junction`、`--behavior/--resource` に対応。`dist` が無い場合は自動でビルド。
+- `bkit deps` : 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `manifest.json` を同期。
+- `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` : プロジェクト/マニフェストのバージョンを更新（任意で min_engine_version も上書き）。
+- `bkit validate [--strict] [--json]` : config / manifest の整合性チェック。
+- `bkit template <list|add|pull|rm>` : テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意のリポジトリを登録可能。
+- `bkit watch` : `./project/<name>` 配下を監視し、変更ごとにビルドと同期を自動実行。`link` モードは非スクリプトをリンク共有し、TS は JS にビルドして `scripts` だけコピー。
+- `bkit setting [--lang <ja|en>] [--project-root <path>]` : CLI 設定を変更（言語/プロジェクト保存先）。フラグ未指定時は対話で選択。
+- `bkit remove [--project <name>]` : プロジェクトフォルダを削除（`--yes` で確認スキップ）。リンク解除は `bkit link remove` を使用。
+- `npm run build:local` / `npm run package:local` : 生成/インポートされた各プロジェクトには `tools/local-build.mjs` と `tools/local-package.mjs` を同梱。BedrockKit CLI がなくても、プロジェクト単体でビルド＆.mcpack/.mcaddon パッケージ化が可能です。
 
 ## 同期ターゲットの書き方
 - **core-build-tasks 経由**（開発版 Minecraft へデプロイ）  

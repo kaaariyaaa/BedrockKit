@@ -5,6 +5,8 @@ import figlet from 'figlet';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Lang } from '../types.js';
+import { t } from './i18n.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,7 +16,7 @@ const pkg = JSON.parse(
   readFileSync(resolve(root, "package.json"), { encoding: "utf8" }),
 ) as { version?: string };
 
-export function printBanner() {
+export function printBanner(lang: Lang) {
   console.clear();
   
   // Huge ASCII Art
@@ -37,13 +39,18 @@ export function printBanner() {
   );
   
   console.log(
-    boxen(`${pc.cyan('v' + (pkg.version || '0.0.0'))} ${pc.gray('•')} ${pc.white('TypeScript CLI for Minecraft Bedrock')}`, {
-      padding: 1,
-      margin: { top: 0, bottom: 1, left: 1, right: 1 },
-      borderStyle: 'round',
-      borderColor: 'cyan',
-      float: 'center',
-    })
+    boxen(
+      `${pc.cyan('v' + (pkg.version || '0.0.0'))} ${pc.gray('•')} ${pc.white(
+        t('ui.bannerTagline', lang),
+      )}`,
+      {
+        padding: 1,
+        margin: { top: 0, bottom: 1, left: 1, right: 1 },
+        borderStyle: 'round',
+        borderColor: 'cyan',
+        float: 'center',
+      },
+    ),
   );
   console.log('');
 }

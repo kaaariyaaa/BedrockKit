@@ -19,10 +19,10 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
     const choice = await select({
       message: t("template.commandPrompt", lang),
       options: [
-        { value: "list", label: "List" },
-        { value: "add", label: "Add(Git URL)" },
-        { value: "pull", label: "Update" },
-        { value: "rm", label: "Remove" },
+        { value: "list", label: t("template.option.list", lang) },
+        { value: "add", label: t("template.option.add", lang) },
+        { value: "pull", label: t("template.option.pull", lang) },
+        { value: "rm", label: t("template.option.remove", lang) },
       ],
       initialValue: "list",
     });
@@ -34,13 +34,17 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
   }
 
   if (!sub || sub === "list") {
-    console.log("[template] Known templates:");
-    registry.forEach((t) =>
-      console.log(`- ${t.name.padEnd(16)} ${t.url}${t.path ? ` (path: ${t.path})` : ""}`),
+    console.log(t("template.known", lang));
+    registry.forEach((entry) =>
+      console.log(
+        t("template.listEntry", lang, {
+          name: entry.name.padEnd(16),
+          url: entry.url,
+          path: entry.path ? t("template.listPath", lang, { path: entry.path }) : "",
+        }),
+      ),
     );
-    console.log(
-      `Registry file: ${templateRegistryPath} (auto-created on add/remove)`,
-    );
+    console.log(t("template.registryFile", lang, { path: templateRegistryPath }));
     return;
   }
 
@@ -70,12 +74,12 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
       url = String(input).trim();
     }
     if (!name || !url) {
-      console.error("Usage: template add <name> <git-url>");
+      console.error(t("template.usageAdd", lang));
       process.exitCode = 1;
       return;
     }
     if (registry.some((t) => t.name === name)) {
-      console.error(`Template '${name}' already exists.`);
+      console.error(t("template.exists", lang, { name }));
       process.exitCode = 1;
       return;
     }
@@ -83,10 +87,18 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
       const path = await cloneTemplate(name, url);
       registry.push({ name, url, path });
       await saveTemplateRegistry(registry);
-      console.log(`[template] Registered template '${name}' from ${url} (path: ${path})`);
+      console.log(
+        t("template.registered", lang, {
+          name,
+          url,
+          path,
+        }),
+      );
     } catch (err) {
       console.error(
-        `[template] Failed to clone template: ${err instanceof Error ? err.message : String(err)}`,
+        t("template.cloneFailed", lang, {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       );
       process.exitCode = 1;
     }
@@ -96,7 +108,7 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
   if (sub === "rm" || sub === "remove") {
     const name = parsed.positional[1];
     if (!name) {
-      console.error("Usage: template rm <name>");
+      console.error(t("template.usageRemove", lang));
       process.exitCode = 1;
       return;
     }
@@ -110,12 +122,12 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
     }
     const next = registry.filter((t) => t.name !== name);
     if (next.length === registry.length) {
-      console.error(`Template '${name}' not found.`);
+      console.error(t("template.notFound", lang, { name }));
       process.exitCode = 1;
       return;
     }
     await saveTemplateRegistry(next);
-    console.log(`[template] Removed template '${name}'`);
+    console.log(t("template.removed", lang, { name }));
     return;
   }
 
@@ -133,13 +145,13 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
       name = String(input).trim();
     }
     if (!name) {
-      console.error("Usage: template pull <name>");
+      console.error(t("template.usagePull", lang));
       process.exitCode = 1;
       return;
     }
     const entry = registry.find((t) => t.name === name);
     if (!entry) {
-      console.error(`Template '${name}' not found.`);
+      console.error(t("template.notFound", lang, { name }));
       process.exitCode = 1;
       return;
     }
@@ -147,16 +159,24 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
       const path = await cloneTemplate(name, entry.url);
       entry.path = path;
       await saveTemplateRegistry(registry);
-      console.log(`[template] Updated '${name}' from ${entry.url} (path: ${path})`);
+      console.log(
+        t("template.updated", lang, {
+          name,
+          url: entry.url,
+          path,
+        }),
+      );
     } catch (err) {
       console.error(
-        `[template] Failed to update template: ${err instanceof Error ? err.message : String(err)}`,
+        t("template.updateFailed", lang, {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       );
       process.exitCode = 1;
     }
     return;
   }
 
-  console.error(`Unknown template subcommand: ${sub}`);
+  console.error(t("template.unknownSubcommand", lang, { sub: String(sub) }));
   process.exitCode = 1;
 }

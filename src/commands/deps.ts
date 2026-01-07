@@ -31,7 +31,7 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   }
 
   if (!(await pathExists(configPath))) {
-    console.error(`Config not found: ${configPath}`);
+    console.error(t("common.configNotFound", lang, { path: configPath }));
     process.exitCode = 1;
     return;
   }
@@ -39,14 +39,14 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   const configCtx = await loadConfigContext(configPath);
   const { config, rootDir } = configCtx;
   if (!config.script) {
-    console.error("No script configuration found in bkit.config.json.");
+    console.error(t("deps.noScriptConfig", lang));
     process.exitCode = 1;
     return;
   }
 
   const packageJsonPath = resolve(rootDir, "package.json");
   if (!(await pathExists(packageJsonPath))) {
-    console.error(`package.json not found: ${packageJsonPath}`);
+    console.error(t("deps.packageJsonNotFound", lang, { path: packageJsonPath }));
     process.exitCode = 1;
     return;
   }
@@ -98,15 +98,15 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
 
   // Apply changes via npm uninstall/install so package.json と node_modules を揃える
   if (toRemove.length) {
-    console.log(`npm uninstall ${toRemove.join(" ")}`);
+    console.log(t("deps.npmUninstall", lang, { packages: toRemove.join(" ") }));
     await runInstallCommand(rootDir, [], { cmd: "npm", args: ["uninstall", ...toRemove] });
   }
   if (toAdd.length) {
-    console.log(`npm install ${toAdd.join(" ")}`);
+    console.log(t("deps.npmInstall", lang, { packages: toAdd.join(" ") }));
     await runInstallCommand(rootDir, toAdd);
   }
   if (!toRemove.length && !toAdd.length) {
-    console.log("No changes to npm dependencies.");
+    console.log(t("deps.noChanges", lang));
   }
 
   // Update config script deps and apiVersion (use @minecraft/server if present).
@@ -121,7 +121,7 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
     ? resolve(configCtx.behavior.path, "manifest.json")
     : resolve(rootDir, config.packs.behavior, "manifest.json");
   if (!(await pathExists(behaviorManifestPath))) {
-    console.error(`Behavior manifest not found: ${behaviorManifestPath}`);
+    console.error(t("deps.behaviorManifestNotFound", lang, { path: behaviorManifestPath }));
     process.exitCode = 1;
     return;
   }

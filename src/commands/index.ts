@@ -8,6 +8,8 @@ import { handleDeps } from "./deps.js";
 import { handleSync } from "./sync.js";
 import { handleImport } from "./import.js";
 import { handleWatch } from "./watch.js";
+import { handleLink } from "./link.js";
+import { handleRemove } from "./remove.js";
 import type { Command, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { t } from "../utils/i18n.js";
@@ -63,6 +65,11 @@ export function buildCommands(lang: Lang, onHelp: () => void): Command[] {
       run: handleSync,
     },
     {
+      name: "link",
+      description: t("command.link.desc", lang),
+      run: handleLink,
+    },
+    {
       name: "watch",
       description: t("command.watch.desc", lang),
       run: handleWatch,
@@ -71,6 +78,12 @@ export function buildCommands(lang: Lang, onHelp: () => void): Command[] {
       name: "setting",
       description: t("command.setting.desc", lang),
       run: handleSetting,
+    },
+    {
+      name: "remove",
+      aliases: ["rm"],
+      description: t("command.remove.desc", lang),
+      run: handleRemove,
     },
     {
       name: "help",

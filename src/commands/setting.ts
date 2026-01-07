@@ -43,7 +43,11 @@ export async function handleSetting(ctx: CommandContext): Promise<void> {
   if (updated) {
     await saveSettings(nextSettings);
     console.log(t("setting.current", currentLang));
-    console.log(`- projectRoot: ${nextSettings.projectRoot?.path ?? "(unset)"}`);
+    console.log(
+      t("setting.projectRootLine", currentLang, {
+        path: nextSettings.projectRoot?.path ?? t("setting.unset", currentLang),
+      }),
+    );
     return;
   }
 
@@ -51,7 +55,11 @@ export async function handleSetting(ctx: CommandContext): Promise<void> {
     message: t("setting.selectItem", currentLang),
     options: [
       { value: "lang", label: t("setting.language", currentLang), hint: t("setting.langDesc", currentLang) },
-      { value: "projectRoot", label: t("setting.projectRoot", currentLang), hint: "project root path" },
+      {
+        value: "projectRoot",
+        label: t("setting.projectRoot", currentLang),
+        hint: t("setting.projectRootHint", currentLang),
+      },
     ],
   });
   if (isCancel(choice)) {
@@ -72,7 +80,7 @@ export async function handleSetting(ctx: CommandContext): Promise<void> {
     });
     console.log(t("setting.languageSaved", next));
     console.log(`${t("setting.current", next)}: lang=${next} (${t("setting.langDesc", next)})`);
-    console.log(`settings: ${getSettingsPath()}`);
+    console.log(t("setting.settingsPath", next, { path: getSettingsPath() }));
   }
 
   if (choice === "projectRoot") {
@@ -86,7 +94,9 @@ export async function handleSetting(ctx: CommandContext): Promise<void> {
       ...settings,
       projectRoot: { path: picked, setupDone: true, onboarding: settings.projectRoot?.onboarding ?? true },
     });
-    console.log(`${t("setting.current", currentLang)}: projectRoot=${picked}`);
+    console.log(
+      t("setting.projectRootSaved", currentLang, { path: picked }),
+    );
   }
 
   return;
