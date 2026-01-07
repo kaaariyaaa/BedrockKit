@@ -149,6 +149,46 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "同期先を選択",
     en: "Select sync target",
   },
+  "link.selectTarget": {
+    ja: "リンク先を選択",
+    en: "Select link target",
+  },
+  "link.selectSource": {
+    ja: "リンク元を選択",
+    en: "Select link source",
+  },
+  "link.source.dist": {
+    ja: "dist（ビルド成果物）",
+    en: "dist (build output)",
+  },
+  "link.source.packs": {
+    ja: "packs（ソース）",
+    en: "packs (source)",
+  },
+  "link.selectMode": {
+    ja: "リンク方式を選択",
+    en: "Select link type",
+  },
+  "link.mode.symlink": {
+    ja: "symlink",
+    en: "symlink",
+  },
+  "link.mode.junction": {
+    ja: "junction（Windows向け）",
+    en: "junction (Windows)",
+  },
+  "link.selectPacks": {
+    ja: "リンクするパックを選択",
+    en: "Select packs to link",
+  },
+  "link.confirmReplace": {
+    ja: "既存のパスを置き換えますか？\n{path}",
+    en: "Replace existing path?\n{path}",
+  },
+  "link.cancelled": {
+    ja: "リンクを中止しました。",
+    en: "Link cancelled.",
+  },
   "watch.selectProjects": {
     ja: "監視するプロジェクトを選択",
     en: "Select projects to watch",
@@ -228,6 +268,10 @@ const dict: Record<string, Record<Lang, string>> = {
   "command.sync.desc": {
     ja: "ビルド成果物を開発フォルダへ同期",
     en: "Sync build outputs to local Minecraft developer folders",
+  },
+  "command.link.desc": {
+    ja: "開発フォルダへシンボリックリンクを作成",
+    en: "Create symlinks in Minecraft development folders",
   },
   "command.watch.desc": {
     ja: "複数プロジェクトを監視し、変更ごとに自動ビルド＋同期",

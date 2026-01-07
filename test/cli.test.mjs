@@ -41,8 +41,13 @@ async function scaffoldProject(projectRoot) {
     packs: { behavior: "packs/behavior", resource: "packs/resource" },
     build: { outDir: "dist", target: "dev" },
     sync: {
-      defaultTarget: "gdk",
-      targets: { gdk: { product: "BedrockGDK", projectName: name } },
+      defaultTarget: "local",
+      targets: {
+        local: {
+          behavior: resolve(root, "dev-target", "behavior"),
+          resource: resolve(root, "dev-target", "resource"),
+        },
+      },
     },
     paths: { root },
   };
@@ -154,6 +159,30 @@ test("CLI commands (smoke tests)", async (t) => {
 
   await t.test("sync (dry-run)", async () => {
     const res = runCli(["sync", "--config", configPath, "--dry-run", "--quiet"], cwd);
+    assert.equal(res.status, 0);
+  });
+
+  await t.test("link (dry-run)", async () => {
+    const res = runCli(
+      [
+        "link",
+        "--config",
+        configPath,
+        "--target",
+        "local",
+        "--source",
+        "packs",
+        "--mode",
+        "junction",
+        "--behavior",
+        "--resource",
+        "--dry-run",
+        "--on-existing",
+        "skip",
+        "--quiet",
+      ],
+      cwd,
+    );
     assert.equal(res.status, 0);
   });
 

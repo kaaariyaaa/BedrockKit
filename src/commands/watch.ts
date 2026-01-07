@@ -113,7 +113,10 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
         });
         log(`[${proj.name}] build+sync completed.`);
       } catch (err) {
-        console.error(`[${proj.name}] build+sync failed:`, err instanceof Error ? err.message : err);
+        console.error(
+          `[${proj.name}] build+sync failed:`,
+          err instanceof Error ? err.message : err,
+        );
       } finally {
         pending = false;
       }
