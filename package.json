@@ -24,7 +24,7 @@
     "dev": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.json",
     "lint": "echo \"(todo) add lint\"",
-    "test": "echo \"(todo) add tests\""
+    "test": "npm run build && node --test"
   },
   "keywords": [
     "minecraft",
