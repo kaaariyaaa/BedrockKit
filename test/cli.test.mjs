@@ -25,7 +25,7 @@ function runCli(args, cwd) {
   return spawnSync(process.execPath, [resolve("dist/cli.js"), ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, FORCE_COLOR: "0" },
+    env: { ...process.env, FORCE_COLOR: "0", BKIT_SETTINGS_DIR: resolve(cwd, ".bkit") },
   });
 }
 
