@@ -153,6 +153,22 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "リンク先を選択",
     en: "Select link target",
   },
+  "link.selectAction": {
+    ja: "実行する操作を選択",
+    en: "Select link action",
+  },
+  "link.action.create": {
+    ja: "リンクを作成",
+    en: "Create links",
+  },
+  "link.action.remove": {
+    ja: "リンクを解除",
+    en: "Remove links",
+  },
+  "link.action.edit": {
+    ja: "リンクを編集（再作成）",
+    en: "Edit links (recreate)",
+  },
   "link.selectSource": {
     ja: "リンク元を選択",
     en: "Select link source",
@@ -169,6 +185,10 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "リンク方式を選択",
     en: "Select link type",
   },
+  "link.buildingDist": {
+    ja: "dist が見つからないためビルドを実行します...",
+    en: "dist not found; running build...",
+  },
   "link.mode.symlink": {
     ja: "symlink",
     en: "symlink",
@@ -184,6 +204,18 @@ const dict: Record<string, Record<Lang, string>> = {
   "link.confirmReplace": {
     ja: "既存のパスを置き換えますか？\n{path}",
     en: "Replace existing path?\n{path}",
+  },
+  "link.removed": {
+    ja: "リンクを解除しました:",
+    en: "Removed link:",
+  },
+  "link.skippedNotLink": {
+    ja: "リンクではないためスキップ:",
+    en: "Skipped (not a link):",
+  },
+  "link.notFound": {
+    ja: "存在しないためスキップ:",
+    en: "Skipped (not found):",
   },
   "link.cancelled": {
     ja: "リンクを中止しました。",
