@@ -329,6 +329,30 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "CLI の設定を変更（言語など）",
     en: "Change CLI settings (language, etc.)",
   },
+  "command.remove.desc": {
+    ja: "プロジェクトを安全に削除",
+    en: "Safely remove a project",
+  },
+  "remove.selectProject": {
+    ja: "削除するプロジェクトを選択",
+    en: "Select a project to remove",
+  },
+  "remove.confirmProject": {
+    ja: "プロジェクト '{name}' を削除しますか？",
+    en: "Remove project '{name}'?",
+  },
+  "remove.notFound": {
+    ja: "指定されたプロジェクトが見つかりません: {name}",
+    en: "Project not found: {name}",
+  },
+  "remove.none": {
+    ja: "削除できるプロジェクトがありません。",
+    en: "No removable projects found.",
+  },
+  "remove.done": {
+    ja: "プロジェクト '{name}' を削除しました。",
+    en: "Removed project '{name}'.",
+  },
   "setting.selectItem": {
     ja: "変更する項目を選択",
     en: "Select a setting to change",

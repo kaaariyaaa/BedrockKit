@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -216,6 +216,20 @@ test("CLI commands (smoke tests)", async (t) => {
   await t.test("setting --lang", async () => {
     const res = runCli(["setting", "--lang", "en"], cwd);
     assert.equal(res.status, 0);
+  });
+
+  await t.test("remove --yes", async () => {
+    const removeCwd = await makeTempWorkspace(true);
+    const removeProject = resolve(removeCwd, "project", "sample-addon");
+    const res = runCli(["remove", "--project", "sample-addon", "--yes"], removeCwd);
+    assert.equal(res.status, 0);
+    let exists = true;
+    try {
+      await stat(removeProject);
+    } catch {
+      exists = false;
+    }
+    assert.equal(exists, false);
   });
 
   await t.test("watch (no projects)", async () => {
