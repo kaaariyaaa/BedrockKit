@@ -153,10 +153,12 @@ export async function runBuildWithMode(options: BuildOptions): Promise<void> {
     // Link behavior/resource packs (lighter build)
     if (behaviorEnabled && behaviorSrc && behaviorDest) {
       await ensureDir(behaviorDest);
+      const hasTsScripts = await hasTypeScriptScripts(behaviorSrc);
       const excludeScripts =
-        !!scriptConfig &&
-        scriptEntryRel &&
-        (scriptConfig.language === "typescript" || scriptEntryRel.endsWith(".ts"));
+        (scriptConfig &&
+          scriptEntryRel &&
+          (scriptConfig.language === "typescript" || scriptEntryRel.endsWith(".ts"))) ||
+        hasTsScripts;
       await linkEntries(
         behaviorSrc,
         behaviorDest,
@@ -223,6 +225,105 @@ async function linkEntries(
       await symlink(srcPath, destPath, "file");
     }
   }
+}
+
+async function hasTypeScriptScripts(packRoot: string): Promise<boolean> {
+  const scriptsRoot = resolve(packRoot, "scripts");
+  if (!(await pathExists(scriptsRoot))) return false;
+  const stack = [scriptsRoot];
+  while (stack.length) {
+    const dir = stack.pop();
+    if (!dir) continue;
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith(".ts")) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+type ScriptBuildOptions = {
+  configPath: string;
+  outDirOverride?: string;
+  quiet?: boolean;
+  jsonOut?: boolean;
+};
+
+export async function runScriptBuildOnly(options: ScriptBuildOptions): Promise<void> {
+  const { configPath, outDirOverride, quiet, jsonOut } = options;
+  const { info: log } = createLogger({ json: jsonOut, quiet });
+
+  if (!(await pathExists(configPath))) {
+    console.error(`Config not found: ${configPath}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const configCtx = await loadConfigContext(configPath);
+  const { config, rootDir } = configCtx;
+  const ignoreRules = await loadIgnoreRules(rootDir);
+  const behaviorEnabled = configCtx.behavior.enabled;
+  const behaviorSrc = configCtx.behavior.path;
+  const scriptConfig = config.script;
+  const scriptEntryRel = scriptConfig?.entry;
+
+  if (!behaviorEnabled || !behaviorSrc || !scriptConfig || !scriptEntryRel) {
+    return;
+  }
+
+  const shouldBundle =
+    scriptConfig.language === "typescript" || scriptEntryRel.endsWith(".ts");
+  if (!shouldBundle) {
+    return;
+  }
+
+  const outDir = resolveOutDir(configCtx, outDirOverride);
+  const behaviorDest = resolve(outDir, config.packs.behavior);
+  const scriptsOutDir = resolve(behaviorDest, "scripts");
+
+  try {
+    await runEslint(rootDir, Boolean(quiet || jsonOut));
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
+
+  await rm(scriptsOutDir, { recursive: true, force: true });
+
+  const entryAbs = resolve(behaviorSrc, scriptEntryRel);
+  const outFile = resolve(
+    behaviorDest,
+    scriptEntryRel.replace(/\.ts$/, ".js"),
+  );
+  await ensureDir(dirname(outFile));
+  const bundleTask = await getBundleTask();
+  const externals =
+    scriptConfig.dependencies
+      ?.filter(
+        (d) =>
+          d.module_name !== "@minecraft/math" && d.module_name !== "@minecraft/vanilla-data",
+      )
+      .map((d) => d.module_name) ?? [];
+  const bundle = bundleTask({
+    entryPoint: entryAbs,
+    outfile: outFile,
+    sourcemap: true,
+    external: externals,
+    minifyWhitespace: false,
+  });
+  log(`Bundling script: ${entryAbs} -> ${outFile}`);
+  await runTask(bundle);
+
+  // Keep ignore rules loaded to match build behavior, even though we only emit scripts.
+  void ignoreRules;
 }
 
 async function getBundleTask(): Promise<

@@ -1,17 +1,18 @@
 import chokidar from "chokidar";
-import { resolve } from "node:path";
+import { resolve, join, dirname } from "node:path";
 import { intro, outro, multiselect, isCancel, select } from "@clack/prompts";
 import { createLogger } from "../core/logger.js";
-import { loadConfigContext } from "../core/config.js";
-import type { CommandContext } from "../types.js";
+import { loadConfigContext, resolveOutDir } from "../core/config.js";
+import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
-import { pathExists } from "../utils/fs.js";
-import { runBuildWithMode } from "./build.js";
+import { ensureDir, pathExists } from "../utils/fs.js";
+import { runBuildWithMode, runScriptBuildOnly } from "./build.js";
 import { handleSync } from "./sync.js";
-import { readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile, lstat, symlink, cp } from "node:fs/promises";
 import { resolveLang, t } from "../utils/i18n.js";
 import { getSettingsPath, loadSettings, resolveProjectRoot } from "../utils/settings.js";
-import { dirname } from "node:path";
+import { createRequire } from "node:module";
+import { loadIgnoreRules, isIgnored } from "../utils/ignore.js";
 
 type ProjectEntry = { name: string; configPath: string };
 type WatchState = {
@@ -21,8 +22,16 @@ type WatchState = {
   startedAt: string;
 };
 type BuildMode = "copy" | "link";
+type SyncTargetConfig = {
+  behavior?: string;
+  resource?: string;
+  product?: string;
+  projectName?: string;
+};
 
 const watchStatePath = resolve(dirname(getSettingsPath()), "watch-link.json");
+const DEVELOPMENT_BEHAVIOR = "development_behavior_packs";
+const DEVELOPMENT_RESOURCE = "development_resource_packs";
 
 async function discoverProjects(cwd: string): Promise<ProjectEntry[]> {
   const settings = await loadSettings();
@@ -40,6 +49,105 @@ async function discoverProjects(cwd: string): Promise<ProjectEntry[]> {
   return found;
 }
 
+function resolveTargetPaths(
+  target: SyncTargetConfig,
+  projectName: string,
+): { behavior?: string; resource?: string } {
+  if (target.behavior || target.resource) {
+    return { behavior: target.behavior, resource: target.resource };
+  }
+  if (!target.product) return {};
+  const require = createRequire(import.meta.url);
+  const coreBuild = require("@minecraft/core-build-tasks");
+  const getGameDeploymentRootPaths = (coreBuild as any).getGameDeploymentRootPaths as
+    | (() => Record<string, string | undefined>)
+    | undefined;
+  if (!getGameDeploymentRootPaths) return {};
+  const rootPaths = getGameDeploymentRootPaths();
+  const root = rootPaths[target.product];
+  if (!root) return {};
+  return {
+    behavior: join(root, DEVELOPMENT_BEHAVIOR, projectName),
+    resource: join(root, DEVELOPMENT_RESOURCE, projectName),
+  };
+}
+
+async function pickTargetName(
+  configCtx: Awaited<ReturnType<typeof loadConfigContext>>,
+  lang: Lang,
+  interactive: boolean,
+): Promise<string | null> {
+  const targets = configCtx.config.sync?.targets ?? {};
+  const names = Object.keys(targets);
+  if (!names.length) return null;
+  const defaultName = configCtx.config.sync.defaultTarget;
+  if (!interactive) {
+    if (defaultName && defaultName in targets) return defaultName;
+    return names[0] ?? null;
+  }
+  if (defaultName && defaultName in targets) return defaultName;
+  if (names.length === 1) return names[0]!;
+  const choice = await select({
+    message: t("sync.selectTarget", lang),
+    options: names.map((name) => ({ value: name, label: name })),
+  });
+  if (isCancel(choice)) return null;
+  return String(choice);
+}
+
+async function linkEntries(
+  srcDir: string,
+  destDir: string,
+  rootDir: string,
+  ignoreRules: RegExp[],
+  excludeNames?: Set<string>,
+): Promise<void> {
+  const entries = await readdir(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (excludeNames?.has(entry.name)) continue;
+    const srcPath = resolve(srcDir, entry.name);
+    if (isIgnored(srcPath, rootDir, ignoreRules)) continue;
+    const destPath = resolve(destDir, entry.name);
+    if (await pathExists(destPath)) {
+      await rm(destPath, { recursive: true, force: true });
+    }
+    if (entry.isDirectory()) {
+      const type = process.platform === "win32" ? "junction" : "dir";
+      await symlink(srcPath, destPath, type);
+    } else if (entry.isSymbolicLink()) {
+      const stat = await lstat(srcPath);
+      const type = stat.isDirectory()
+        ? process.platform === "win32"
+          ? "junction"
+          : "dir"
+        : "file";
+      await symlink(srcPath, destPath, type);
+    } else {
+      await symlink(srcPath, destPath, "file");
+    }
+  }
+}
+
+async function removeSymlinkEntries(rootDir: string): Promise<void> {
+  const stack = [rootDir];
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current) continue;
+    const entries = await readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = resolve(current, entry.name);
+      const stat = await lstat(fullPath);
+      if (stat.isSymbolicLink()) {
+        await rm(fullPath, { recursive: true, force: true });
+        continue;
+      }
+      if (stat.isDirectory()) {
+        stack.push(fullPath);
+      }
+    }
+  }
+}
+
 async function saveWatchState(state: WatchState): Promise<void> {
   await writeFile(watchStatePath, JSON.stringify(state, null, 2), "utf8");
 }
@@ -49,9 +157,230 @@ async function removeWatchState(): Promise<void> {
   await rm(watchStatePath, { force: true });
 }
 
+async function hasTypeScriptScripts(packRoot: string): Promise<boolean> {
+  const scriptsRoot = resolve(packRoot, "scripts");
+  if (!(await pathExists(scriptsRoot))) return false;
+  const stack = [scriptsRoot];
+  while (stack.length) {
+    const dir = stack.pop();
+    if (!dir) continue;
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith(".ts")) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+async function copyBehaviorPackFinal(
+  configCtx: Awaited<ReturnType<typeof loadConfigContext>>,
+  targetPath: string,
+  outDirOverride: string,
+): Promise<void> {
+  const { config, rootDir } = configCtx;
+  const ignoreRules = await loadIgnoreRules(rootDir);
+  const behaviorSrc = configCtx.behavior.path;
+  if (!behaviorSrc) return;
+  const hasTs = await hasTypeScriptScripts(behaviorSrc);
+  await ensureDir(dirname(targetPath));
+  await rm(targetPath, { recursive: true, force: true });
+  await cp(behaviorSrc, targetPath, {
+    recursive: true,
+    force: true,
+    filter: (src) => {
+      if (isIgnored(src, rootDir, ignoreRules)) return false;
+      if (!hasTs) return true;
+      const rel = src.replace(/\\/g, "/");
+      if (!rel.includes("/scripts/")) return true;
+      return !rel.endsWith(".ts");
+    },
+  });
+  if (hasTs) {
+    const buildDir = resolveOutDir(configCtx, outDirOverride);
+    const scriptsOut = resolve(buildDir, config.packs.behavior, "scripts");
+    if (await pathExists(scriptsOut)) {
+      const scriptsTarget = resolve(targetPath, "scripts");
+      await rm(scriptsTarget, { recursive: true, force: true });
+      await ensureDir(scriptsTarget);
+      await cp(scriptsOut, scriptsTarget, { recursive: true, force: true });
+    }
+  }
+}
+
+async function copyResourcePackFinal(
+  configCtx: Awaited<ReturnType<typeof loadConfigContext>>,
+  targetPath: string,
+): Promise<void> {
+  const { rootDir } = configCtx;
+  const ignoreRules = await loadIgnoreRules(rootDir);
+  const resourceSrc = configCtx.resource.path;
+  if (!resourceSrc) return;
+  await ensureDir(dirname(targetPath));
+  await rm(targetPath, { recursive: true, force: true });
+  await cp(resourceSrc, targetPath, {
+    recursive: true,
+    force: true,
+    filter: (src) => !isIgnored(src, rootDir, ignoreRules),
+  });
+}
+
+async function syncLinkMode(
+  configCtx: Awaited<ReturnType<typeof loadConfigContext>>,
+  outDirOverride: string,
+  lang: Lang,
+): Promise<void> {
+  const { config, rootDir } = configCtx;
+  const ignoreRules = await loadIgnoreRules(rootDir);
+  const buildDir = resolveOutDir(configCtx, outDirOverride);
+  const targetName = await pickTargetName(configCtx, lang, true);
+  if (!targetName) {
+    throw new Error("No sync target selected.");
+  }
+  const targets = config.sync?.targets ?? {};
+  const targetConfig = targets[targetName] as SyncTargetConfig | undefined;
+  if (!targetConfig) {
+    throw new Error(`Sync target not found: ${targetName}`);
+  }
+  const projectName = targetConfig.projectName ?? config.project.name;
+  const targetPaths = resolveTargetPaths(targetConfig, projectName);
+  if (configCtx.behavior.enabled && !targetPaths.behavior) {
+    throw new Error(`Target '${targetName}' missing behavior path in sync.targets`);
+  }
+  if (configCtx.resource.enabled && !targetPaths.resource) {
+    throw new Error(`Target '${targetName}' missing resource path in sync.targets`);
+  }
+
+  if (configCtx.behavior.enabled && configCtx.behavior.path && targetPaths.behavior) {
+    const behaviorSrc = configCtx.behavior.path;
+    const behaviorDest = targetPaths.behavior;
+    const hasTs = await hasTypeScriptScripts(behaviorSrc);
+    await ensureDir(behaviorDest);
+    await linkEntries(
+      behaviorSrc,
+      behaviorDest,
+      rootDir,
+      ignoreRules,
+      hasTs ? new Set(["scripts"]) : undefined,
+    );
+    if (hasTs) {
+      const scriptsOut = resolve(buildDir, config.packs.behavior, "scripts");
+      if (await pathExists(scriptsOut)) {
+        const scriptsTarget = resolve(behaviorDest, "scripts");
+        await rm(scriptsTarget, { recursive: true, force: true });
+        await ensureDir(scriptsTarget);
+        await cp(scriptsOut, scriptsTarget, { recursive: true, force: true });
+      }
+    }
+  }
+
+  if (configCtx.resource.enabled && configCtx.resource.path && targetPaths.resource) {
+    const resourceSrc = configCtx.resource.path;
+    const resourceDest = targetPaths.resource;
+    await ensureDir(resourceDest);
+    await linkEntries(resourceSrc, resourceDest, rootDir, ignoreRules);
+  }
+}
+
+async function removeLinkTargets(
+  configCtx: Awaited<ReturnType<typeof loadConfigContext>>,
+  lang: Lang,
+): Promise<void> {
+  const { config } = configCtx;
+  const targetName = await pickTargetName(configCtx, lang, false);
+  if (!targetName) {
+    throw new Error("No sync target selected.");
+  }
+  const targets = config.sync?.targets ?? {};
+  const targetConfig = targets[targetName] as SyncTargetConfig | undefined;
+  if (!targetConfig) {
+    throw new Error(`Sync target not found: ${targetName}`);
+  }
+  const projectName = targetConfig.projectName ?? config.project.name;
+  const targetPaths = resolveTargetPaths(targetConfig, projectName);
+  const candidates = [targetPaths.behavior, targetPaths.resource].filter(
+    (p): p is string => !!p,
+  );
+  for (const targetPath of candidates) {
+    if (!(await pathExists(targetPath))) continue;
+    const stat = await lstat(targetPath);
+    if (stat.isSymbolicLink()) {
+      await rm(targetPath, { recursive: true, force: true });
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+    await removeSymlinkEntries(targetPath);
+  }
+}
+
+async function finalizeSyncCopy(
+  configCtx: Awaited<ReturnType<typeof loadConfigContext>>,
+  outDir: string,
+  lang: Lang,
+): Promise<void> {
+  const { config } = configCtx;
+  const targetName = await pickTargetName(configCtx, lang, false);
+  if (!targetName) {
+    throw new Error("No sync target selected.");
+  }
+  const targets = config.sync?.targets ?? {};
+  const targetConfig = targets[targetName] as SyncTargetConfig | undefined;
+  if (!targetConfig) {
+    throw new Error(`Sync target not found: ${targetName}`);
+  }
+  const projectName = targetConfig.projectName ?? config.project.name;
+  const targetPaths = resolveTargetPaths(targetConfig, projectName);
+
+  if (configCtx.behavior.enabled && targetPaths.behavior) {
+    await copyBehaviorPackFinal(configCtx, targetPaths.behavior, outDir);
+  }
+  if (configCtx.resource.enabled && targetPaths.resource) {
+    await copyResourcePackFinal(configCtx, targetPaths.resource);
+  }
+}
+
+async function finalizeWatchBuilds(
+  projects: ProjectEntry[],
+  outDir: string,
+  lang: Lang,
+): Promise<void> {
+  for (const proj of projects) {
+    try {
+      const configCtx = await loadConfigContext(proj.configPath);
+      try {
+        await removeLinkTargets(configCtx, lang);
+      } catch (err) {
+        console.error(
+          `[${proj.name}] finalize unlink failed: ${err instanceof Error ? err.message : err}`,
+        );
+        throw err;
+      }
+      try {
+        await finalizeSyncCopy(configCtx, outDir, lang);
+      } catch (err) {
+        console.error(
+          `[${proj.name}] finalize sync step failed: ${err instanceof Error ? err.message : err}`,
+        );
+        throw err;
+      }
+    } catch (err) {
+      console.error(
+        `[${proj.name}] finalize build failed: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+}
+
 async function recoverFromWatchState(
   log: (msg: string) => void,
   defaultOutDir: string,
+  lang: Lang,
 ): Promise<void> {
   if (!(await pathExists(watchStatePath))) return;
   try {
@@ -63,37 +392,13 @@ async function recoverFromWatchState(
     }
     const outDir = state.outDir || defaultOutDir;
     log("Detected leftover watch link state. Finalizing build outputs...");
-    await finalizeWatchBuilds(state.projects, outDir);
+    await finalizeWatchBuilds(state.projects, outDir, lang);
   } catch (err) {
     console.error(
       `Failed to recover watch state: ${err instanceof Error ? err.message : err}`,
     );
   } finally {
     await removeWatchState();
-  }
-}
-
-async function finalizeWatchBuilds(
-  projects: ProjectEntry[],
-  outDir: string,
-): Promise<void> {
-  for (const proj of projects) {
-    try {
-      await runBuildWithMode({
-        configPath: proj.configPath,
-        outDirOverride: outDir,
-        mode: "copy",
-        quiet: true,
-      });
-      await handleSync({
-        argv: ["--config", proj.configPath, "--build=false", "--build-dir", outDir, "--quiet"],
-        root: process.cwd(),
-      });
-    } catch (err) {
-      console.error(
-        `[${proj.name}] finalize build failed: ${err instanceof Error ? err.message : err}`,
-      );
-    }
   }
 }
 
@@ -107,7 +412,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
   const { info: log } = createLogger({ quiet });
 
-  await recoverFromWatchState(log, outDirOverride);
+  await recoverFromWatchState(log, outDirOverride, lang);
 
   const settings = await loadSettings();
   const projects = await discoverProjects(process.cwd());
@@ -172,7 +477,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     cleanupRequested = true;
     if (buildMode === "link") {
       log("Finalizing build outputs (copy mode)...");
-      await finalizeWatchBuilds(selectedProjects, outDirOverride);
+      await finalizeWatchBuilds(selectedProjects, outDirOverride, lang);
       await removeWatchState();
     }
     process.exit();
@@ -211,23 +516,36 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
       pending = true;
       log(`[${proj.name}] change detected (${reason}), building...`);
       try {
-        await runBuildWithMode({
-          configPath: proj.configPath,
-          outDirOverride,
-          mode: buildMode,
-          quiet: true,
-        });
-        await handleSync({
-          ...ctx,
-          argv: [
-            "--config",
-            proj.configPath,
-            "--build=false",
-            "--build-dir",
+        if (buildMode === "link") {
+          await runScriptBuildOnly({
+            configPath: proj.configPath,
             outDirOverride,
-            "--quiet",
-          ],
-        });
+            quiet: true,
+          });
+        } else {
+          await runBuildWithMode({
+            configPath: proj.configPath,
+            outDirOverride,
+            mode: buildMode,
+            quiet: true,
+          });
+        }
+        if (buildMode === "link") {
+          const configCtx = await loadConfigContext(proj.configPath);
+          await syncLinkMode(configCtx, outDirOverride, lang);
+        } else {
+          await handleSync({
+            ...ctx,
+            argv: [
+              "--config",
+              proj.configPath,
+              "--build=false",
+              "--build-dir",
+              outDirOverride,
+              "--quiet",
+            ],
+          });
+        }
         log(`[${proj.name}] build+sync completed.`);
       } catch (err) {
         console.error(
