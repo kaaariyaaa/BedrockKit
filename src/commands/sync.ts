@@ -22,11 +22,11 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     (typeof parsed.flags["build-dir"] === "string" && parsed.flags["build-dir"]) ||
     (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
     undefined;
-  let shouldBuild = parsed.flags.build !== false; // default true
+  let shouldBuild = parsed.flags.build === true; // default false
   if (parsed.flags.build === undefined && !dryRun && !jsonOut && !quiet) {
     const buildChoice = await confirm({
       message: t("sync.runBuild", lang),
-      initialValue: true,
+      initialValue: false,
     });
     if (isCancel(buildChoice)) {
       console.error(t("sync.cancelled", lang));

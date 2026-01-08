@@ -98,8 +98,8 @@ const dict: Record<string, Record<Lang, string>> = {
     en: "Initializing workspace",
   },
   "init.title": {
-    ja: "BedrockKit Init",
-    en: "BedrockKit Init",
+    ja: "BedrockKit Create",
+    en: "BedrockKit Create",
   },
   "init.templateUrlPrompt": {
     ja: "テンプレートの Git URL を入力",
@@ -685,9 +685,9 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "リソースマニフェストが見つかりません: {path}",
     en: "Resource manifest not found: {path}",
   },
-  "command.init.desc": {
+  "command.create.desc": {
     ja: "テンプレートから新規ワークスペースを作成",
-    en: "Initialize a new Bedrock addon/resource pack workspace from a template",
+    en: "Create a new Bedrock addon/resource pack workspace from a template",
   },
   "command.bump.desc": {
     ja: "バージョンを更新し、マニフェスト等を再生成",
@@ -1098,8 +1098,8 @@ const dict: Record<string, Record<Lang, string>> = {
     en: "Suppress non-error logs (build/package/sync/validate)",
   },
   "help.flag.build": {
-    ja: "sync/package の事前ビルドを無効化 (default: true)",
-    en: "Skip pre-build for sync/package (default: true)",
+    ja: "sync/package の事前ビルドを制御 (sync: --build で有効 / package: --build=false で無効)",
+    en: "Control pre-build (sync: enable with --build / package: disable with --build=false)",
   },
   "help.bkitignore": {
     ja: ".bkitignore:",

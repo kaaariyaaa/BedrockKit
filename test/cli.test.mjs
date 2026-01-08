@@ -139,9 +139,9 @@ test("CLI commands (smoke tests)", async (t) => {
     assert.equal(res.status, 0);
   });
 
-  await t.test("init (non-interactive)", async () => {
+  await t.test("create (non-interactive)", async () => {
     const res = runCli(
-      ["init", "--yes", "--skip-install", "--no-script", "--name", "init-addon"],
+      ["create", "--yes", "--skip-install", "--no-script", "--name", "init-addon"],
       cwd,
     );
     assert.equal(res.status, 0);
