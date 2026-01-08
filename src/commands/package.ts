@@ -2,7 +2,8 @@ import { resolve } from "node:path";
 import { stat } from "node:fs/promises";
 import { confirm, isCancel } from "@clack/prompts";
 import { createLogger } from "../core/logger.js";
-import { loadConfigContext, resolveConfigPath, resolveOutDir } from "../core/config.js";
+import { loadConfigContext, resolveOutDir } from "../core/config.js";
+import { resolveConfigPathFromArgs } from "../core/projects.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
@@ -14,6 +15,7 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
+  const interactive = !jsonOut && !quiet && !parsed.flags.yes;
   const { info: log } = createLogger({ json: jsonOut, quiet });
   let shouldBuild = parsed.flags.build !== false; // default true
   if (parsed.flags.build === undefined) {
@@ -30,9 +32,18 @@ export async function handlePackage(ctx: CommandContext): Promise<void> {
       shouldBuild = !!buildChoice;
     }
   }
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
+
+  let configPath: string | null;
+  try {
+    configPath = await resolveConfigPathFromArgs(parsed, lang, { interactive });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
+
   if (!configPath) {
-    console.error(t("common.configSelectionCancelled", lang));
+    console.error(t("project.noneFound", lang));
     process.exitCode = 1;
     return;
   }

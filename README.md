@@ -31,20 +31,20 @@ npm install -g .   # もしくは npm link でローカルリンク
 ## クイックスタート
 ```bash
 # プロジェクトを対話的に初期化（./project/<name> 以下に展開）
-bkit init
+bkit create
 
 # ビルドして dist/ に成果物を作成
-bkit build
+bkit build <project>
 
 # ビルド成果物を開発用フォルダに同期
-bkit sync
+bkit sync <project>
 
 # 配布用 .mcpack/.mcaddon を作成
-bkit package
+bkit package <project>
 ```
 
 ## 生成される構成例
-`bkit init` で作られる標準構成は次のとおりです。
+`bkit create` で作られる標準構成は次のとおりです。
 
 ```
 project/<addon-name>/
@@ -83,19 +83,19 @@ project/<addon-name>/
 ```
 
 ## 主なコマンド
-- `bkit init` (`new`) : テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。ESLint ルールは有効/無効を対話選択でき、フラグ `--eslint-rules <csv>` / `--no-eslint` でも指定可能。
+- `bkit create` (`new`) : テンプレートからワークスペースを作成。スクリプト API のパッケージとバージョンも対話的に選択可能。ESLint ルールは有効/無効を対話選択でき、フラグ `--eslint-rules <csv>` / `--no-eslint` でも指定可能。
 - `bkit import <mcpack|mcaddon|zip>` : 既存アーカイブを展開し、`bkit.config.json` を生成してワークスペース化。JS→TS 変換はオプション（`--convert-ts`）。自動変換は互換性リスクがあるため、必要な場合のみ利用を推奨します。
 - `bkit build [--out-dir <dir>]` : ビヘイビア/リソースパックを `dist/` にコピー。スクリプトが TypeScript の場合は `@minecraft/core-build-tasks` でバンドルを実行。
 - `bkit package [--out <name>]` : `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。
 - `bkit sync [--target <name>] [--build=false]` : ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` 指定で Minecraft 開発環境へデプロイ。
-- `bkit link [create|remove|edit]` : 開発フォルダへシンボリックリンクを作成/解除/再作成。`--source dist|packs`、`--mode symlink|junction`、`--behavior/--resource` に対応。`dist` が無い場合は自動でビルド。
+- `bkit link [<project>]` : 開発フォルダへシンボリックリンクを作成/解除/再作成。`<project>` を指定するとそのプロジェクトの `bkit.config.json` を使用し、未指定なら対話で選択します。操作（作成/解除/再作成）は対話で選択できます。`--action create|remove|edit` で非対話指定も可能です。`--source dist|packs`、`--mode symlink|junction`、`--behavior/--resource` に対応。`dist` が無い場合は自動でビルド。
 - `bkit deps` : 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `manifest.json` を同期。
 - `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` : プロジェクト/マニフェストのバージョンを更新（任意で min_engine_version も上書き）。
 - `bkit validate [--strict] [--json]` : config / manifest の整合性チェック。
 - `bkit template <list|add|pull|rm>` : テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意のリポジトリを登録可能。
 - `bkit watch` : `./project/<name>` 配下を監視し、変更ごとにビルドと同期を自動実行。`link` モードは非スクリプトをリンク共有し、TS は JS にビルドして `scripts` だけコピー。
 - `bkit setting [--lang <ja|en>] [--project-root <path>]` : CLI 設定を変更（言語/プロジェクト保存先）。フラグ未指定時は対話で選択。
-- `bkit remove [--project <name>]` : プロジェクトフォルダを削除（`--yes` で確認スキップ）。リンク解除は `bkit link remove` を使用。
+- `bkit remove [--project <name>]` : プロジェクトフォルダを削除（`--yes` で確認スキップ）。削除前に同期先フォルダ内のリンクも可能な範囲で解除します。
 - `npm run build:local` / `npm run package:local` : 生成/インポートされた各プロジェクトには `tools/local-build.mjs` と `tools/local-package.mjs` を同梱。BedrockKit CLI がなくても、プロジェクト単体でビルド＆.mcpack/.mcaddon パッケージ化が可能です。
 
 ## 同期ターゲットの書き方
@@ -106,7 +106,7 @@ project/<addon-name>/
 
 ## テンプレート運用
 - 既定で `official-sample` が登録されています。`bkit template list` で確認可能です。
-- 任意の Git リポジトリを `bkit template add <name> <git-url>` で登録し、`bkit init --template <name>` で利用できます。
+- 任意の Git リポジトリを `bkit template add <name> <git-url>` で登録し、`bkit create --template <name>` で利用できます。
 - `.bkit/templates/<name>` にクローンされるため、社内リポジトリ等も扱えます（SSH キーは `BKIT_SSH_KEY` 環境変数で指定可能）。
 
 ## 便利なオプション
@@ -118,7 +118,7 @@ project/<addon-name>/
 - **.bkitignore**: ビルド／同期時に無視するパターンを記載。
 
 ## よくある流れ
-1. `bkit init` で土台を作成（または `bkit import` で既存アドオンを取り込み）。
+1. `bkit create` で土台を作成（または `bkit import` で既存アドオンを取り込み）。
 2. `bkit build` で成果物を作成し、`bkit validate` で整合性確認。
 3. `bkit sync` でゲームの開発用フォルダに反映、`bkit watch` で自動同期しながら開発。
 4. リリース時に `bkit bump` でバージョンを上げ、`bkit package` で配布用アーカイブを生成。

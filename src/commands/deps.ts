@@ -2,7 +2,8 @@ import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { multiselect, isCancel, outro } from "@clack/prompts";
 import type { Manifest } from "../core/manifest.js";
-import { loadConfigContext, resolveConfigPath } from "../core/config.js";
+import { loadConfigContext } from "../core/config.js";
+import { resolveConfigPathFromArgs } from "../core/projects.js";
 import {
   MANIFEST_SCRIPT_PACKAGES,
   SCRIPT_API_OPTIONS,
@@ -23,9 +24,19 @@ async function readManifest(path: string): Promise<Manifest> {
 export async function handleDeps(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
+  const interactive = !parsed.flags.yes;
+
+  let configPath: string | null;
+  try {
+    configPath = await resolveConfigPathFromArgs(parsed, lang, { interactive });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
+
   if (!configPath) {
-    console.error(t("common.cancelled", lang));
+    console.error(t("project.noneFound", lang));
     process.exitCode = 1;
     return;
   }

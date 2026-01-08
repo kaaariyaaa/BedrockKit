@@ -18,9 +18,9 @@ import { handleSetting } from "./setting.js";
 export function buildCommands(lang: Lang, onHelp: () => void): Command[] {
   return [
     {
-      name: "init",
+      name: "create",
       aliases: ["new"],
-      description: t("command.init.desc", lang),
+      description: t("command.create.desc", lang),
       run: handleInit,
     },
     {

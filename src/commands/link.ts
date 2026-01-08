@@ -1,57 +1,10 @@
-import { lstat, rm, symlink } from "node:fs/promises";
-import { dirname, resolve, join } from "node:path";
-import { createRequire } from "node:module";
-import { select, multiselect, confirm, isCancel } from "@clack/prompts";
-import { createLogger } from "../core/logger.js";
-import { loadConfigContext, resolveConfigPath, resolveOutDir } from "../core/config.js";
+import { isCancel, select } from "@clack/prompts";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
-import { ensureDir, pathExists } from "../utils/fs.js";
 import { resolveLang, t } from "../utils/i18n.js";
-import { runBuildWithMode } from "./build.js";
+import { runLink } from "../services/link.js";
 
-type ExistingMode = "skip" | "replace" | "ask";
-type LinkMode = "symlink" | "junction";
-type LinkSource = "dist" | "packs";
 type LinkAction = "create" | "remove" | "edit";
-
-const DEVELOPMENT_BEHAVIOR = "development_behavior_packs";
-const DEVELOPMENT_RESOURCE = "development_resource_packs";
-
-async function getExistingType(path: string): Promise<"none" | "link" | "dir" | "file"> {
-  try {
-    const stat = await lstat(path);
-    if (stat.isSymbolicLink()) return "link";
-    if (stat.isDirectory()) return "dir";
-    return "file";
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return "none";
-    throw err;
-  }
-}
-
-function resolveTargetPaths(
-  target: { behavior?: string; resource?: string; product?: string; projectName?: string },
-  projectName: string,
-): { behavior?: string; resource?: string } {
-  if (target.behavior || target.resource) {
-    return { behavior: target.behavior, resource: target.resource };
-  }
-  if (!target.product) return {};
-  const require = createRequire(import.meta.url);
-  const coreBuild = require("@minecraft/core-build-tasks");
-  const getGameDeploymentRootPaths = (coreBuild as any).getGameDeploymentRootPaths as
-    | (() => Record<string, string | undefined>)
-    | undefined;
-  if (!getGameDeploymentRootPaths) return {};
-  const rootPaths = getGameDeploymentRootPaths();
-  const root = rootPaths[target.product];
-  if (!root) return {};
-  return {
-    behavior: join(root, DEVELOPMENT_BEHAVIOR, projectName),
-    resource: join(root, DEVELOPMENT_RESOURCE, projectName),
-  };
-}
 
 export async function handleLink(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
@@ -60,23 +13,16 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
   const dryRun = !!parsed.flags["dry-run"];
   const interactive = !jsonOut && !quiet && !parsed.flags.yes;
-  const { info: log } = createLogger({ json: jsonOut, quiet });
 
-  const actionPos = parsed.positional[0]?.toLowerCase();
-  const actionFlag = parsed.flags.remove || parsed.flags.unlink
-    ? "remove"
-    : parsed.flags.edit
-      ? "edit"
-      : undefined;
+  const actionFlag = (parsed.flags.action as string | undefined)?.toLowerCase();
   let action: LinkAction | undefined =
-    actionFlag ??
-    (actionPos === "remove" || actionPos === "unlink" || actionPos === "rm" || actionPos === "delete"
+    actionFlag === "remove" || actionFlag === "rm" || actionFlag === "unlink"
       ? "remove"
-      : actionPos === "edit" || actionPos === "update"
+      : actionFlag === "edit" || actionFlag === "update"
         ? "edit"
-        : actionPos === "create" || actionPos === "link"
+        : actionFlag === "create" || actionFlag === "link"
           ? "create"
-          : undefined);
+          : undefined;
   if (!action && interactive) {
     const choice = await select({
       message: t("link.selectAction", lang),
@@ -96,251 +42,15 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
   }
   action = action ?? "create";
 
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
-  if (!configPath) {
-    console.error(t("link.cancelled", lang));
-    process.exitCode = 1;
-    return;
-  }
-
-  const configCtx = await loadConfigContext(configPath);
-  const { config, rootDir } = configCtx;
-  const behaviorEnabled = configCtx.behavior.enabled;
-  const resourceEnabled = configCtx.resource.enabled;
-
-  const targets = config.sync?.targets ?? {};
-  const targetNames = Object.keys(targets);
-  if (!targetNames.length) {
-    console.error(t("link.noTargets", lang));
-    process.exitCode = 1;
-    return;
-  }
-
-  let targetName = parsed.flags.target as string | undefined;
-  if (!targetName) targetName = config.sync.defaultTarget;
-  if (!targetName || !(targetName in targets)) {
-    const choice = await select({
-      message: t("link.selectTarget", lang),
-      options: targetNames.map((t) => ({ value: t, label: t })),
-    });
-    if (isCancel(choice)) {
-      console.error(t("link.cancelled", lang));
-      process.exitCode = 1;
-      return;
-    }
-    targetName = String(choice);
-  }
-
-  const targetConfig = targets[targetName!];
-  const projectName = targetConfig.projectName ?? config.project.name;
-  const targetPaths = resolveTargetPaths(targetConfig, projectName);
-
-  if (behaviorEnabled && !targetPaths.behavior) {
-    console.error(t("link.targetMissingBehavior", lang, { target: targetName }));
-    process.exitCode = 1;
-    return;
-  }
-  if (resourceEnabled && !targetPaths.resource) {
-    console.error(t("link.targetMissingResource", lang, { target: targetName }));
-    process.exitCode = 1;
-    return;
-  }
-
-  let source = (parsed.flags.source as string | undefined) as LinkSource | undefined;
-  let mode = (parsed.flags.mode as string | undefined) as LinkMode | undefined;
-
-  let selected: string[] = [];
-  if (parsed.flags.behavior) selected.push("behavior");
-  if (parsed.flags.resource) selected.push("resource");
-  if (!selected.length && interactive) {
-    const options = [];
-    if (behaviorEnabled) options.push({ value: "behavior", label: t("init.pack.behavior", lang) });
-    if (resourceEnabled) options.push({ value: "resource", label: t("init.pack.resource", lang) });
-    const choice = await multiselect({
-      message: t("link.selectPacks", lang),
-      options,
-      initialValues: options.map((o) => o.value as string),
-    });
-    if (isCancel(choice)) {
-      console.error(t("link.cancelled", lang));
-      process.exitCode = 1;
-      return;
-    }
-    selected = choice as string[];
-  }
-  if (!selected.length) {
-    if (behaviorEnabled) selected.push("behavior");
-    if (resourceEnabled) selected.push("resource");
-  }
-  if (!selected.length) {
-    console.error(t("link.noPacksSelected", lang));
-    process.exitCode = 1;
-    return;
-  }
-
-  const onExistingFlag = parsed.flags["on-existing"] as string | undefined;
-  let onExisting: ExistingMode = "skip";
-  if (parsed.flags.force || onExistingFlag === "replace") onExisting = "replace";
-  if (onExistingFlag === "skip") onExisting = "skip";
-  if (!parsed.flags.force && !onExistingFlag && interactive) onExisting = "ask";
-  if (action === "edit") onExisting = "replace";
-
-  const targetsToHandle: { name: string; to: string }[] = [];
-  if (selected.includes("behavior") && behaviorEnabled) {
-    targetsToHandle.push({ name: "behavior", to: targetPaths.behavior! });
-  }
-  if (selected.includes("resource") && resourceEnabled) {
-    targetsToHandle.push({ name: "resource", to: targetPaths.resource! });
-  }
-
-  if (action === "remove") {
-    const removed: { to: string }[] = [];
-    const skipped: { to: string; reason: string }[] = [];
-    for (const { to } of targetsToHandle) {
-      const existingType = await getExistingType(to);
-      if (existingType === "none") {
-        skipped.push({ to, reason: "not_found" });
-        if (!jsonOut) log(`${t("link.notFound", lang)} ${to}`);
-        continue;
-      }
-      if (existingType !== "link" && !parsed.flags.force) {
-        skipped.push({ to, reason: "not_link" });
-        if (!jsonOut) log(`${t("link.skippedNotLink", lang)} ${to}`);
-        continue;
-      }
-      if (!dryRun) {
-        await rm(to, { recursive: true, force: true });
-        if (!jsonOut) log(`${t("link.removed", lang)} ${to}`);
-      } else if (!jsonOut) {
-        log(t("link.dryRunRemove", lang, { path: to }));
-      }
-      removed.push({ to });
-    }
-    if (jsonOut) {
-      console.log(JSON.stringify({ ok: process.exitCode !== 1, dryRun, removed, skipped }, null, 2));
-    }
-    return;
-  }
-
-  if (!source) {
-    const choice = await select({
-      message: t("link.selectSource", lang),
-      options: [
-        { value: "dist", label: t("link.source.dist", lang) },
-        { value: "packs", label: t("link.source.packs", lang) },
-      ],
-      initialValue: "dist",
-    });
-    if (isCancel(choice)) {
-      console.error(t("link.cancelled", lang));
-      process.exitCode = 1;
-      return;
-    }
-    source = String(choice) as LinkSource;
-  }
-  source = source ?? "dist";
-
-  if (!mode) {
-    const choice = await select({
-      message: t("link.selectMode", lang),
-      options: [
-        { value: "junction", label: t("link.mode.junction", lang) },
-        { value: "symlink", label: t("link.mode.symlink", lang) },
-      ],
-      initialValue: process.platform === "win32" ? "junction" : "symlink",
-    });
-    if (isCancel(choice)) {
-      console.error(t("link.cancelled", lang));
-      process.exitCode = 1;
-      return;
-    }
-    mode = String(choice) as LinkMode;
-  }
-  mode = mode ?? (process.platform === "win32" ? "junction" : "symlink");
-
-  const buildDirOverride =
-    (typeof parsed.flags["build-dir"] === "string" && parsed.flags["build-dir"]) ||
-    (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
-    undefined;
-  const buildDir = resolveOutDir(configCtx, buildDirOverride);
-
-  const sources: { name: string; from: string; to: string }[] = [];
-  if (selected.includes("behavior") && behaviorEnabled) {
-    const from = source === "dist"
-      ? resolve(buildDir, config.packs.behavior)
-      : resolve(rootDir, config.packs.behavior);
-    sources.push({ name: "behavior", from, to: targetPaths.behavior! });
-  }
-  if (selected.includes("resource") && resourceEnabled) {
-    const from = source === "dist"
-      ? resolve(buildDir, config.packs.resource)
-      : resolve(rootDir, config.packs.resource);
-    sources.push({ name: "resource", from, to: targetPaths.resource! });
-  }
-
-  if (source === "dist") {
-    let missing = false;
-    for (const { from } of sources) {
-      if (!(await pathExists(from))) {
-        missing = true;
-        break;
-      }
-    }
-      if (missing) {
-        if (!jsonOut && !quiet) log(t("link.buildingDist", lang));
-        await runBuildWithMode({
-          configPath,
-          outDirOverride: buildDirOverride,
-          mode: "copy",
-          quiet,
-          jsonOut,
-          lang,
-        });
-      }
-  }
-  for (const { from } of sources) {
-    if (!(await pathExists(from))) {
-      console.error(t("link.sourceNotFound", lang, { path: from }));
-      process.exitCode = 1;
-      return;
-    }
-  }
-
-  const linked: { from: string; to: string }[] = [];
-  for (const { from, to } of sources) {
-    const existingType = await getExistingType(to);
-    let action = onExisting;
-    if (existingType !== "none" && onExisting === "ask") {
-      const replace = await confirm({
-        message: t("link.confirmReplace", lang, { path: to }),
-        initialValue: false,
-      });
-      if (isCancel(replace)) {
-        console.error(t("link.cancelled", lang));
-        process.exitCode = 1;
-        return;
-      }
-      action = replace ? "replace" : "skip";
-    }
-    if (existingType !== "none" && action === "skip") {
-      if (!jsonOut) log(t("link.skippedExists", lang, { path: to }));
-      continue;
-    }
-    if (!dryRun) {
-      await ensureDir(dirname(to));
-      if (existingType !== "none" && action === "replace") {
-        await rm(to, { recursive: true, force: true });
-      }
-      const linkType = mode === "junction" ? "junction" : "dir";
-      await symlink(from, to, linkType);
-      if (!jsonOut) log(t("link.linked", lang, { from, to }));
-    } else if (!jsonOut) {
-      log(t("link.dryRunLink", lang, { from, to }));
-    }
-    linked.push({ from, to });
-  }
-
-  if (jsonOut) {
-    console.log(JSON.stringify({ ok: process.exitCode !== 1, dryRun, linked }, null, 2));
-  }
+  const ok = await runLink({
+    parsed,
+    action,
+    lang,
+    jsonOut,
+    quiet,
+    dryRun,
+    interactive,
+  });
+  if (!ok) process.exitCode = 1;
 }
+

@@ -3,13 +3,13 @@ import { readFile } from "node:fs/promises";
 import type { Manifest } from "../core/manifest.js";
 import {
   loadConfigContext,
-  resolveConfigPath,
   validateConfig,
 } from "../core/config.js";
 import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
 import { resolveLang, t } from "../utils/i18n.js";
+import { resolveConfigPathFromArgs } from "../core/projects.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -21,13 +21,21 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const strict = !!parsed.flags.strict;
   const jsonOut = !!parsed.flags.json;
-  const cwd = process.cwd();
+  const interactive = !jsonOut && !parsed.flags.yes;
   const issues: string[] = [];
 
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
+  let configPath: string | null;
+  try {
+    configPath = await resolveConfigPathFromArgs(parsed, lang, { interactive });
+  } catch (err) {
+    issues.push(err instanceof Error ? err.message : String(err));
+    report(issues, lang, { json: jsonOut });
+    return;
+  }
+
   if (!configPath) {
-    issues.push(t("common.configSelectionCancelled", lang));
-    report(issues, lang, { json: jsonOut, configPath: configPath ?? undefined });
+    issues.push(interactive ? t("common.cancelled", lang) : t("project.noneFound", lang));
+    report(issues, lang, { json: jsonOut });
     return;
   }
 

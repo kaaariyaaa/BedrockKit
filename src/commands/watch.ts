@@ -434,7 +434,9 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  let selected: string[] = parsed.flags.projects
+  let selected: string[] = parsed.positional.length
+    ? parsed.positional.map(String)
+    : parsed.flags.projects
     ? String(parsed.flags.projects)
         .split(",")
         .map((s) => s.trim())

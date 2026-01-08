@@ -31,20 +31,20 @@ For direct testing from source during development, you can run `src/cli.ts` usin
 ## Quick Start
 ```bash
 # Interactively initialize a project (extracted under ./project/<name>)
-bkit init
+bkit create
 
 # Build and create outputs in dist/
-bkit build
+bkit build <project>
 
 # Sync build outputs to development folder
-bkit sync
+bkit sync <project>
 
 # Create .mcpack/.mcaddon for distribution
-bkit package
+bkit package <project>
 ```
 
 ## Example Structure
-The standard structure created by `bkit init` is as follows:
+The standard structure created by `bkit create` is as follows:
 
 ```
 project/<addon-name>/
@@ -83,19 +83,19 @@ Minimal example of `bkit.config.json`:
 ```
 
 ## Main Commands
-- `bkit init` (`new`) : Create a workspace from a template. You can interactively select Script API packages and versions. ESLint rules can be toggled interactively or via `--eslint-rules <csv>` / `--no-eslint` flags.
+- `bkit create` (`new`) : Create a workspace from a template. You can interactively select Script API packages and versions. ESLint rules can be toggled interactively or via `--eslint-rules <csv>` / `--no-eslint` flags.
 - `bkit import <mcpack|mcaddon|zip>` : Extract an existing archive and generate `bkit.config.json` for workspace conversion. JS to TS conversion is optional (`--convert-ts`). Automatic conversion is recommended only when necessary due to compatibility risks.
 - `bkit build [--out-dir <dir>]` : Copy packs to `dist/`. If scripts are in TypeScript, they are bundled using `@minecraft/core-build-tasks`.
 - `bkit package [--out <name>]` : Create `.mcpack` (both packs) or `.mcaddon` (if both exist) from the `dist/` folder.
 - `bkit sync [--target <name>] [--build=false]` : Copy build outputs to locations defined in `config.sync.targets`. Specifying `product` allows deployment to Minecraft development environments.
-- `bkit link [create|remove|edit]` : Create/remove/recreate symlinks in development folders. Supports `--source dist|packs`, `--mode symlink|junction`, and `--behavior/--resource`. If `dist` is missing it triggers a build.
+- `bkit link [<project>]` : Create/remove/recreate symlinks in development folders. If `<project>` is provided, it resolves `bkit.config.json` from that project; otherwise it prompts you to select one. The action (create/remove/edit) is selected interactively, or you can force it via `--action create|remove|edit`. Supports `--source dist|packs`, `--mode symlink|junction`, and `--behavior/--resource`. If `dist` is missing it triggers a build.
 - `bkit deps` : Install selected Script API dependencies via npm and sync `bkit.config.json` and `manifest.json`.
 - `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` : Update project/manifest versions (optionally override min_engine_version).
 - `bkit validate [--strict] [--json]` : Check consistency between config and manifest files.
 - `bkit template <list|add|pull|rm>` : Manage the template registry (`.bkit/templates*.json`). Any repository can be registered as `custom-git`.
 - `bkit watch` : Watch the project folder and automatically perform build and sync on changes. Link mode shares non-script assets via symlink and copies built JS into `scripts`.
 - `bkit setting [--lang <ja|en>] [--project-root <path>]` : Manage CLI settings (language, project root). Prompts when no flags are provided.
-- `bkit remove [--project <name>]` : Remove a project folder (use `--yes` to skip confirmation). Use `bkit link remove` to unlink dev folders.
+- `bkit remove [--project <name>]` : Remove a project folder (use `--yes` to skip confirmation). It also tries to clean up symlinks inside the target sync folders before deletion.
 - `npm run build:local` / `npm run package:local` : Each generated/imported project ships with `tools/local-build.mjs` and `tools/local-package.mjs`. You can build and create `.mcpack/.mcaddon` archives without the BedrockKit CLI.
 
 ## Sync Targets
@@ -106,7 +106,7 @@ Minimal example of `bkit.config.json`:
 
 ## Template Management
 - `official-sample` is registered by default. Check via `bkit template list`.
-- Register any Git repository with `bkit template add <name> <git-url>` and use it via `bkit init --template <name>`.
+- Register any Git repository with `bkit template add <name> <git-url>` and use it via `bkit create --template <name>`.
 - Templates are cloned to `.bkit/templates/<name>`. Private repositories are supported (SSH keys can be specified via `BKIT_SSH_KEY`).
 
 ## Useful Options
@@ -118,7 +118,7 @@ Minimal example of `bkit.config.json`:
 - **.bkitignore**: Patterns listed in `.bkitignore` are ignored during build and sync.
 
 ## Common Workflow
-1. `bkit init`: Initialize a project.
+1. `bkit create`: Initialize a project.
 2. `bkit build`: Build the project.
 3. `bkit sync` or `bkit watch`: Sync to the development environment.
 4. `bkit package`: Generate distribution archives.

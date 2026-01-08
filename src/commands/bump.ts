@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { select, text, isCancel, outro } from "@clack/prompts";
 import type { Manifest, ManifestDependency } from "../core/manifest.js";
-import { loadConfigContext, resolveConfigPath } from "../core/config.js";
+import { loadConfigContext } from "../core/config.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists, writeJson } from "../utils/fs.js";
@@ -13,6 +13,7 @@ import {
   stringToVersionTuple,
 } from "../utils/version.js";
 import { resolveLang, t } from "../utils/i18n.js";
+import { resolveConfigPathFromArgs } from "../core/projects.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -37,14 +38,25 @@ function updateManifestVersion(manifest: Manifest, nextVersionTuple: [number, nu
 export async function handleBump(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
-  const level = (parsed.positional[0] as BumpLevel | undefined) ?? "patch";
+  const level = (parsed.positional[1] as BumpLevel | undefined) ?? "patch";
   const toVersion = (parsed.flags.to as string | undefined) ?? (parsed.flags.set as string | undefined);
   const minEngine = parsed.flags["min-engine"] as string | undefined;
   const nonInteractive = !!parsed.flags.yes;
 
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
+  let configPath: string | null;
+  try {
+    configPath = await resolveConfigPathFromArgs(parsed, lang, {
+      interactive: !nonInteractive,
+      projectArgIndex: 0,
+    });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
+
   if (!configPath) {
-    console.error(t("common.configSelectionCancelled", lang));
+    console.error(!nonInteractive ? t("common.cancelled", lang) : t("project.noneFound", lang));
     process.exitCode = 1;
     return;
   }
@@ -62,7 +74,7 @@ export async function handleBump(ctx: CommandContext): Promise<void> {
   let nextLevel = level;
   let nextMinEngineInput = minEngine;
 
-  if (!nonInteractive && !nextVersionString && !parsed.positional.length) {
+  if (!nonInteractive && !nextVersionString && parsed.positional.length < 2) {
     const choice = await select({
       message: t("bump.selectType", lang),
       options: [
