@@ -34,13 +34,13 @@ npm install -g .   # もしくは npm link でローカルリンク
 bkit create
 
 # ビルドして dist/ に成果物を作成
-bkit build
+bkit build <project>
 
 # ビルド成果物を開発用フォルダに同期
-bkit sync
+bkit sync <project>
 
 # 配布用 .mcpack/.mcaddon を作成
-bkit package
+bkit package <project>
 ```
 
 ## 生成される構成例
@@ -88,14 +88,14 @@ project/<addon-name>/
 - `bkit build [--out-dir <dir>]` : ビヘイビア/リソースパックを `dist/` にコピー。スクリプトが TypeScript の場合は `@minecraft/core-build-tasks` でバンドルを実行。
 - `bkit package [--out <name>]` : `dist/` 以下から `.mcpack`（両パック）、両方揃っていれば `.mcaddon` も作成。
 - `bkit sync [--target <name>] [--build=false]` : ビルド成果物を `config.sync.targets` で指定した場所へコピー。`product` 指定で Minecraft 開発環境へデプロイ。
-- `bkit link [create|remove|edit]` : 開発フォルダへシンボリックリンクを作成/解除/再作成。`--source dist|packs`、`--mode symlink|junction`、`--behavior/--resource` に対応。`dist` が無い場合は自動でビルド。
+- `bkit link [<project>]` : 開発フォルダへシンボリックリンクを作成/解除/再作成。`<project>` を指定するとそのプロジェクトの `bkit.config.json` を使用し、未指定なら対話で選択します。操作（作成/解除/再作成）は対話で選択できます。`--action create|remove|edit` で非対話指定も可能です。`--source dist|packs`、`--mode symlink|junction`、`--behavior/--resource` に対応。`dist` が無い場合は自動でビルド。
 - `bkit deps` : 選択した Script API 依存を npm にインストールし、`bkit.config.json` と `manifest.json` を同期。
 - `bkit bump [major|minor|patch] [--to <version>] [--min-engine <x.y.z>]` : プロジェクト/マニフェストのバージョンを更新（任意で min_engine_version も上書き）。
 - `bkit validate [--strict] [--json]` : config / manifest の整合性チェック。
 - `bkit template <list|add|pull|rm>` : テンプレートレジストリ(`.bkit/templates*.json`)の管理。`custom-git` で任意のリポジトリを登録可能。
 - `bkit watch` : `./project/<name>` 配下を監視し、変更ごとにビルドと同期を自動実行。`link` モードは非スクリプトをリンク共有し、TS は JS にビルドして `scripts` だけコピー。
 - `bkit setting [--lang <ja|en>] [--project-root <path>]` : CLI 設定を変更（言語/プロジェクト保存先）。フラグ未指定時は対話で選択。
-- `bkit remove [--project <name>]` : プロジェクトフォルダを削除（`--yes` で確認スキップ）。リンク解除は `bkit link remove` を使用。
+- `bkit remove [--project <name>]` : プロジェクトフォルダを削除（`--yes` で確認スキップ）。削除前に同期先フォルダ内のリンクも可能な範囲で解除します。
 - `npm run build:local` / `npm run package:local` : 生成/インポートされた各プロジェクトには `tools/local-build.mjs` と `tools/local-package.mjs` を同梱。BedrockKit CLI がなくても、プロジェクト単体でビルド＆.mcpack/.mcaddon パッケージ化が可能です。
 
 ## 同期ターゲットの書き方

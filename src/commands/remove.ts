@@ -8,6 +8,7 @@ import { pathExists } from "../utils/fs.js";
 import { loadSettings, resolveProjectRoot } from "../utils/settings.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import { createRequire } from "node:module";
+import { promptSelectProjects } from "../core/projects.js";
 
 type ProjectEntry = { name: string; root: string; configPath: string };
 type SyncTargetConfig = {
@@ -85,6 +86,7 @@ export async function handleRemove(ctx: CommandContext): Promise<void> {
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
   const yes = !!parsed.flags.yes;
+  const interactive = !quiet && !yes;
 
   const projects = await discoverProjects();
   if (!projects.length) {
@@ -93,44 +95,35 @@ export async function handleRemove(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  let projectName = parsed.flags.project as string | undefined;
-  if (!projectName && parsed.positional[0]) {
-    projectName = String(parsed.positional[0]);
-  }
-  if (!projectName && !quiet) {
-    const choice = await select({
-      message: t("remove.selectProject", lang),
-      options: projects.map((p) => ({ value: p.name, label: p.name })),
-    });
-    if (isCancel(choice)) {
-      console.error(t("common.cancelled", lang));
-      process.exitCode = 1;
-      return;
-    }
-    projectName = String(choice);
-  }
+  const projectsArg =
+    parsed.positional.length > 0
+      ? parsed.positional.map(String)
+      : typeof parsed.flags.project === "string"
+        ? String(parsed.flags.project).split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
 
-  const project = projects.find((p) => p.name === projectName);
-  if (!project) {
-    console.error(t("remove.notFound", lang, { name: projectName ?? "" }));
+  let selectedProjects: ProjectEntry[] =
+    projectsArg.length > 0
+      ? projects.filter((p) => projectsArg.includes(p.name))
+      : interactive
+        ? (await promptSelectProjects(lang, { initialAll: false }))?.map((p) => ({
+            name: p.name,
+            root: p.root,
+            configPath: p.configPath,
+          })) ?? []
+        : [];
+
+  if (!selectedProjects.length) {
+    console.error(t("common.cancelled", lang));
     process.exitCode = 1;
     return;
   }
 
-  const configCtx = await loadConfigContext(project.configPath);
-  const distDir = resolve(project.root, configCtx.config.build?.outDir ?? "dist");
-  const watchDir = resolve(project.root, ".watch-dist");
-  const targetNames = Object.keys(configCtx.config.sync?.targets ?? {});
-  let targetName = (parsed.flags.target as string | undefined) ?? configCtx.config.sync?.defaultTarget;
-  if (!targetName || !(targetName in (configCtx.config.sync?.targets ?? {}))) {
-    if (targetNames.length === 1) {
-      targetName = targetNames[0];
-    } else if (targetNames.length && !quiet) {
-      const choice = await select({
-        message: t("sync.selectTarget", lang),
-        options: targetNames.map((name) => ({ value: name, label: name })),
-      });
-      if (!isCancel(choice)) targetName = String(choice);
+  for (const name of projectsArg) {
+    if (!projects.some((p) => p.name === name)) {
+      console.error(t("remove.notFound", lang, { name }));
+      process.exitCode = 1;
+      return;
     }
   }
 
@@ -139,7 +132,10 @@ export async function handleRemove(ctx: CommandContext): Promise<void> {
 
   if (!quiet && !yes) {
     const ok = await confirm({
-      message: t("remove.confirmProject", lang, { name: project.name }),
+      message:
+        selectedProjects.length === 1
+          ? t("remove.confirmProject", lang, { name: selectedProjects[0]!.name })
+          : t("remove.confirmProjects", lang, { count: String(selectedProjects.length) }),
       initialValue: false,
     });
     if (isCancel(ok) || !ok) {
@@ -149,36 +145,55 @@ export async function handleRemove(ctx: CommandContext): Promise<void> {
     }
   }
 
-  if (targetName) {
-    const targetConfig = (configCtx.config.sync?.targets ?? {})[targetName] as SyncTargetConfig | undefined;
-    if (targetConfig) {
-      const projectName = targetConfig.projectName ?? configCtx.config.project?.name ?? project.name;
-      const targetPaths = resolveTargetPaths(targetConfig, projectName);
-      const candidates = [targetPaths.behavior, targetPaths.resource].filter(
-        (p): p is string => !!p,
-      );
-      for (const targetPath of candidates) {
-        if (!(await pathExists(targetPath))) continue;
-        const stat = await lstat(targetPath);
-        if (stat.isSymbolicLink()) {
-          await rm(targetPath, { recursive: true, force: true });
-          continue;
-        }
-        if (!stat.isDirectory()) continue;
-        await removeSymlinkEntries(targetPath);
+  for (const project of selectedProjects) {
+    const configCtx = await loadConfigContext(project.configPath);
+    const distDir = resolve(project.root, configCtx.config.build?.outDir ?? "dist");
+    const watchDir = resolve(project.root, ".watch-dist");
+    const targetNames = Object.keys(configCtx.config.sync?.targets ?? {});
+    let targetName = (parsed.flags.target as string | undefined) ?? configCtx.config.sync?.defaultTarget;
+    if (!targetName || !(targetName in (configCtx.config.sync?.targets ?? {}))) {
+      if (targetNames.length === 1) {
+        targetName = targetNames[0];
+      } else if (targetNames.length && !quiet) {
+        const choice = await select({
+          message: t("sync.selectTarget", lang),
+          options: targetNames.map((name) => ({ value: name, label: name })),
+        });
+        if (!isCancel(choice)) targetName = String(choice);
       }
     }
-  }
 
-  await rm(project.root, { recursive: true, force: true });
-  if (removeDist) {
-    await rm(distDir, { recursive: true, force: true });
-  }
-  if (removeWatch) {
-    await rm(watchDir, { recursive: true, force: true });
-  }
+    if (targetName) {
+      const targetConfig = (configCtx.config.sync?.targets ?? {})[targetName] as SyncTargetConfig | undefined;
+      if (targetConfig) {
+        const projectName = targetConfig.projectName ?? configCtx.config.project?.name ?? project.name;
+        const targetPaths = resolveTargetPaths(targetConfig, projectName);
+        const candidates = [targetPaths.behavior, targetPaths.resource].filter(
+          (p): p is string => !!p,
+        );
+        for (const targetPath of candidates) {
+          if (!(await pathExists(targetPath))) continue;
+          const stat = await lstat(targetPath);
+          if (stat.isSymbolicLink()) {
+            await rm(targetPath, { recursive: true, force: true });
+            continue;
+          }
+          if (!stat.isDirectory()) continue;
+          await removeSymlinkEntries(targetPath);
+        }
+      }
+    }
 
-  if (!quiet) {
-    console.log(t("remove.done", lang, { name: project.name }));
+    await rm(project.root, { recursive: true, force: true });
+    if (removeDist) {
+      await rm(distDir, { recursive: true, force: true });
+    }
+    if (removeWatch) {
+      await rm(watchDir, { recursive: true, force: true });
+    }
+
+    if (!quiet) {
+      console.log(t("remove.done", lang, { name: project.name }));
+    }
   }
 }

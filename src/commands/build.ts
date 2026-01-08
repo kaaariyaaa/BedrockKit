@@ -3,7 +3,8 @@ import { dirname, resolve, relative } from "node:path";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { createLogger } from "../core/logger.js";
-import { loadConfigContext, resolveConfigPath, resolveOutDir } from "../core/config.js";
+import { loadConfigContext, resolveOutDir } from "../core/config.js";
+import { promptSelectProjects, resolveProjectsByName } from "../core/projects.js";
 import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
@@ -37,24 +38,47 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const jsonOut = !!parsed.flags.json;
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
+  const interactive = !jsonOut && !quiet && !parsed.flags.yes;
   const outDirOverride =
     (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
     (typeof parsed.flags.outdir === "string" && parsed.flags.outdir) ||
     undefined;
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
-  if (!configPath) {
-    console.error(t("common.configSelectionCancelled", lang));
+  const projectsArg =
+    parsed.positional.length > 0
+      ? parsed.positional.map(String)
+      : typeof parsed.flags.project === "string"
+        ? String(parsed.flags.project).split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+
+  let projects =
+    projectsArg.length > 0
+      ? await resolveProjectsByName(projectsArg, lang)
+      : interactive
+        ? await promptSelectProjects(lang, { initialAll: true })
+        : [];
+
+  if (projects === null) {
+    console.error(t("common.cancelled", lang));
     process.exitCode = 1;
     return;
   }
-  await runBuildWithMode({
-    configPath,
-    outDirOverride,
-    mode: "copy",
-    quiet,
-    jsonOut,
-    lang,
-  });
+  projects = projects ?? [];
+  if (!projects.length) {
+    console.error(t("project.noneFound", lang));
+    process.exitCode = 1;
+    return;
+  }
+
+  for (const proj of projects) {
+    await runBuildWithMode({
+      configPath: proj.configPath,
+      outDirOverride,
+      mode: "copy",
+      quiet,
+      jsonOut,
+      lang,
+    });
+  }
 }
 
 export async function runBuildWithMode(options: BuildOptions): Promise<void> {

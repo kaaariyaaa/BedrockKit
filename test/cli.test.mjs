@@ -148,17 +148,17 @@ test("CLI commands (smoke tests)", async (t) => {
   });
 
   await t.test("build", async () => {
-    const res = runCli(["build", "--config", configPath, "--quiet"], cwd);
+    const res = runCli(["build", "sample-addon", "--quiet"], cwd);
     assert.equal(res.status, 0);
   });
 
   await t.test("package", async () => {
-    const res = runCli(["package", "--config", configPath, "--build=false", "--quiet"], cwd);
+    const res = runCli(["package", "sample-addon", "--build=false", "--quiet"], cwd);
     assert.equal(res.status, 0);
   });
 
   await t.test("sync (dry-run)", async () => {
-    const res = runCli(["sync", "--config", configPath, "--dry-run", "--quiet"], cwd);
+    const res = runCli(["sync", "sample-addon", "--dry-run", "--quiet"], cwd);
     assert.equal(res.status, 0);
   });
 
@@ -166,8 +166,7 @@ test("CLI commands (smoke tests)", async (t) => {
     const res = runCli(
       [
         "link",
-        "--config",
-        configPath,
+        "sample-addon",
         "--target",
         "local",
         "--source",
@@ -187,19 +186,19 @@ test("CLI commands (smoke tests)", async (t) => {
   });
 
   await t.test("validate", async () => {
-    const res = runCli(["validate", "--config", configPath, "--json"], cwd);
+    const res = runCli(["validate", "sample-addon", "--json"], cwd);
     assert.equal(res.status, 0);
   });
 
   await t.test("bump", async () => {
-    const res = runCli(["bump", "patch", "--config", configPath, "--yes"], cwd);
+    const res = runCli(["bump", "sample-addon", "patch", "--yes"], cwd);
     assert.equal(res.status, 0);
     const updated = JSON.parse(await readFile(configPath, "utf8"));
     assert.equal(updated.project.version, "1.0.1");
   });
 
   await t.test("deps (expected failure without script)", async () => {
-    const res = runCli(["deps", "--config", configPath], cwd);
+    const res = runCli(["deps", "sample-addon"], cwd);
     assert.notEqual(res.status, 0);
   });
 

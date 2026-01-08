@@ -877,6 +877,10 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "プロジェクト '{name}' を削除しますか？",
     en: "Remove project '{name}'?",
   },
+  "remove.confirmProjects": {
+    ja: "{count} 個のプロジェクトを削除しますか？",
+    en: "Remove {count} projects?",
+  },
   "remove.notFound": {
     ja: "指定されたプロジェクトが見つかりません: {name}",
     en: "Project not found: {name}",
@@ -1116,6 +1120,22 @@ const dict: Record<string, Record<Lang, string>> = {
   "ui.bannerTagline": {
     ja: "Minecraft Bedrock 向け TypeScript CLI",
     en: "TypeScript CLI for Minecraft Bedrock",
+  },
+  "project.selectOne": {
+    ja: "プロジェクトを選択",
+    en: "Select a project",
+  },
+  "project.selectMany": {
+    ja: "プロジェクトを選択（複数可）",
+    en: "Select projects (multi)",
+  },
+  "project.notFound": {
+    ja: "プロジェクトが見つかりません: {name}",
+    en: "Project not found: {name}",
+  },
+  "project.noneFound": {
+    ja: "プロジェクトが見つかりません。",
+    en: "No projects found.",
   },
 };
 

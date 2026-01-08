@@ -3,13 +3,13 @@ import { readFile } from "node:fs/promises";
 import type { Manifest } from "../core/manifest.js";
 import {
   loadConfigContext,
-  resolveConfigPath,
   validateConfig,
 } from "../core/config.js";
 import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { pathExists } from "../utils/fs.js";
 import { resolveLang, t } from "../utils/i18n.js";
+import { promptSelectProject, resolveProjectsByName } from "../core/projects.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -21,13 +21,32 @@ export async function handleValidate(ctx: CommandContext): Promise<void> {
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const strict = !!parsed.flags.strict;
   const jsonOut = !!parsed.flags.json;
-  const cwd = process.cwd();
+  const interactive = !jsonOut && !parsed.flags.yes;
   const issues: string[] = [];
 
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
+  const configFlag = parsed.flags.config as string | undefined;
+  let configPath: string | undefined;
+  if (configFlag) {
+    configPath = configFlag;
+  } else {
+    const projectArg = parsed.positional[0] ? String(parsed.positional[0]) : undefined;
+    if (projectArg) {
+      const resolved = await resolveProjectsByName([projectArg], lang);
+      configPath = resolved?.[0]?.configPath;
+    } else if (interactive) {
+      const picked = await promptSelectProject(lang);
+      if (!picked) {
+        issues.push(t("common.cancelled", lang));
+        report(issues, lang, { json: jsonOut });
+        return;
+      }
+      configPath = picked.configPath;
+    }
+  }
+
   if (!configPath) {
-    issues.push(t("common.configSelectionCancelled", lang));
-    report(issues, lang, { json: jsonOut, configPath: configPath ?? undefined });
+    issues.push(t("project.noneFound", lang));
+    report(issues, lang, { json: jsonOut });
     return;
   }
 

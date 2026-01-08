@@ -9,6 +9,7 @@ import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import { runBuildWithMode } from "./build.js";
+import { loadSettings, resolveProjectRoot } from "../utils/settings.js";
 
 type ExistingMode = "skip" | "replace" | "ask";
 type LinkMode = "symlink" | "junction";
@@ -62,21 +63,15 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
   const interactive = !jsonOut && !quiet && !parsed.flags.yes;
   const { info: log } = createLogger({ json: jsonOut, quiet });
 
-  const actionPos = parsed.positional[0]?.toLowerCase();
-  const actionFlag = parsed.flags.remove || parsed.flags.unlink
-    ? "remove"
-    : parsed.flags.edit
-      ? "edit"
-      : undefined;
+  const actionFlag = (parsed.flags.action as string | undefined)?.toLowerCase();
   let action: LinkAction | undefined =
-    actionFlag ??
-    (actionPos === "remove" || actionPos === "unlink" || actionPos === "rm" || actionPos === "delete"
+    actionFlag === "remove" || actionFlag === "rm" || actionFlag === "unlink"
       ? "remove"
-      : actionPos === "edit" || actionPos === "update"
+      : actionFlag === "edit" || actionFlag === "update"
         ? "edit"
-        : actionPos === "create" || actionPos === "link"
+        : actionFlag === "create" || actionFlag === "link"
           ? "create"
-          : undefined);
+          : undefined;
   if (!action && interactive) {
     const choice = await select({
       message: t("link.selectAction", lang),
@@ -96,7 +91,30 @@ export async function handleLink(ctx: CommandContext): Promise<void> {
   }
   action = action ?? "create";
 
-  const configPath = await resolveConfigPath(parsed.flags.config as string | undefined, lang);
+  // bkit link <project> (recommended): resolve to <projectRoot>/<project>/bkit.config.json
+  const positionalProject = parsed.positional[0] ? String(parsed.positional[0]) : undefined;
+  const settings = await loadSettings();
+  const projectRoot = resolveProjectRoot(settings);
+  const tryResolveConfigFromPositional = async (): Promise<string | undefined> => {
+    if (!positionalProject) return undefined;
+    const looksLikePath =
+      positionalProject.includes("/") ||
+      positionalProject.includes("\\") ||
+      positionalProject.includes(":") ||
+      positionalProject.toLowerCase().endsWith(".json");
+    if (looksLikePath) {
+      const abs = resolve(process.cwd(), positionalProject);
+      if (await pathExists(abs)) return abs;
+      return undefined;
+    }
+    const byName = resolve(projectRoot, positionalProject, "bkit.config.json");
+    if (await pathExists(byName)) return byName;
+    return undefined;
+  };
+
+  const configPath =
+    (await tryResolveConfigFromPositional()) ??
+    (await resolveConfigPath(parsed.flags.config as string | undefined, lang));
   if (!configPath) {
     console.error(t("link.cancelled", lang));
     process.exitCode = 1;
