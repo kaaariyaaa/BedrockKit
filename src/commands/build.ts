@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
-import { promptSelectProjects, resolveProjectsByName } from "../core/projects.js";
+import { resolveProjectsFromArgs } from "../core/projects.js";
 import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
@@ -43,19 +43,15 @@ export async function handleBuild(ctx: CommandContext): Promise<void> {
     (typeof parsed.flags["out-dir"] === "string" && parsed.flags["out-dir"]) ||
     (typeof parsed.flags.outdir === "string" && parsed.flags.outdir) ||
     undefined;
-  const projectsArg =
-    parsed.positional.length > 0
-      ? parsed.positional.map(String)
-      : typeof parsed.flags.project === "string"
-        ? String(parsed.flags.project).split(",").map((s) => s.trim()).filter(Boolean)
-        : [];
 
-  let projects =
-    projectsArg.length > 0
-      ? await resolveProjectsByName(projectsArg, lang)
-      : interactive
-        ? await promptSelectProjects(lang, { initialAll: true })
-        : [];
+  let projects: Awaited<ReturnType<typeof resolveProjectsFromArgs>>;
+  try {
+    projects = await resolveProjectsFromArgs(parsed, lang, { interactive, initialAll: true });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
 
   if (projects === null) {
     console.error(t("common.cancelled", lang));

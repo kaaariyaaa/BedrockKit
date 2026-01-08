@@ -12,6 +12,11 @@ export type ProjectInfo = {
   configPath: string;
 };
 
+export type ParsedArgsLike = {
+  positional: unknown[];
+  flags: Record<string, unknown>;
+};
+
 export async function discoverProjects(): Promise<ProjectInfo[]> {
   const settings = await loadSettings();
   const base = resolveProjectRoot(settings);
@@ -27,6 +32,18 @@ export async function discoverProjects(): Promise<ProjectInfo[]> {
     }
   }
   return found;
+}
+
+export function parseProjectNames(parsed: ParsedArgsLike): string[] {
+  if (parsed.positional.length > 0) return parsed.positional.map(String);
+  const flag = parsed.flags.project;
+  if (typeof flag === "string") {
+    return String(flag)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 export async function resolveProjectsByName(
@@ -45,6 +62,17 @@ export async function resolveProjectsByName(
     resolved.push(entry);
   }
   return resolved;
+}
+
+export async function resolveProjectsFromArgs(
+  parsed: ParsedArgsLike,
+  lang: Lang,
+  opts: { interactive: boolean; initialAll?: boolean },
+): Promise<ProjectInfo[] | null> {
+  const names = parseProjectNames(parsed);
+  if (names.length > 0) return await resolveProjectsByName(names, lang);
+  if (!opts.interactive) return [];
+  return await promptSelectProjects(lang, { initialAll: opts.initialAll });
 }
 
 export async function promptSelectProject(
@@ -79,3 +107,22 @@ export async function promptSelectProjects(
   return projects.filter((p) => selected.has(p.name));
 }
 
+export async function resolveConfigPathFromArgs(
+  parsed: ParsedArgsLike,
+  lang: Lang,
+  opts: { interactive: boolean; projectArgIndex?: number } = { interactive: false },
+): Promise<string | null> {
+  const configFlag = parsed.flags.config;
+  if (typeof configFlag === "string" && configFlag) return configFlag;
+
+  const idx = opts.projectArgIndex ?? 0;
+  const projectArg = parsed.positional[idx] ? String(parsed.positional[idx]) : undefined;
+  if (projectArg) {
+    const resolved = await resolveProjectsByName([projectArg], lang);
+    return resolved?.[0]?.configPath ?? null;
+  }
+
+  if (!opts.interactive) return null;
+  const picked = await promptSelectProject(lang);
+  return picked?.configPath ?? null;
+}

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { multiselect, isCancel, outro } from "@clack/prompts";
 import type { Manifest } from "../core/manifest.js";
 import { loadConfigContext } from "../core/config.js";
-import { promptSelectProject, resolveProjectsByName } from "../core/projects.js";
+import { resolveConfigPathFromArgs } from "../core/projects.js";
 import {
   MANIFEST_SCRIPT_PACKAGES,
   SCRIPT_API_OPTIONS,
@@ -25,24 +25,14 @@ export async function handleDeps(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
   const interactive = !parsed.flags.yes;
-  const configFlag = parsed.flags.config as string | undefined;
-  let configPath: string | undefined;
-  if (configFlag) {
-    configPath = configFlag;
-  } else {
-    const projectArg = parsed.positional[0] ? String(parsed.positional[0]) : undefined;
-    if (projectArg) {
-      const resolved = await resolveProjectsByName([projectArg], lang);
-      configPath = resolved?.[0]?.configPath;
-    } else if (interactive) {
-      const picked = await promptSelectProject(lang);
-      if (!picked) {
-        console.error(t("common.cancelled", lang));
-        process.exitCode = 1;
-        return;
-      }
-      configPath = picked.configPath;
-    }
+
+  let configPath: string | null;
+  try {
+    configPath = await resolveConfigPathFromArgs(parsed, lang, { interactive });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
   }
 
   if (!configPath) {

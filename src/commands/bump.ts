@@ -13,7 +13,7 @@ import {
   stringToVersionTuple,
 } from "../utils/version.js";
 import { resolveLang, t } from "../utils/i18n.js";
-import { promptSelectProject, resolveProjectsByName } from "../core/projects.js";
+import { resolveConfigPathFromArgs } from "../core/projects.js";
 
 async function readManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, { encoding: "utf8" });
@@ -38,31 +38,25 @@ function updateManifestVersion(manifest: Manifest, nextVersionTuple: [number, nu
 export async function handleBump(ctx: CommandContext): Promise<void> {
   const parsed = parseArgs(ctx.argv);
   const lang = ctx.lang ?? resolveLang(parsed.flags.lang);
-  const projectArg = parsed.positional[0] ? String(parsed.positional[0]) : undefined;
   const level = (parsed.positional[1] as BumpLevel | undefined) ?? "patch";
   const toVersion = (parsed.flags.to as string | undefined) ?? (parsed.flags.set as string | undefined);
   const minEngine = parsed.flags["min-engine"] as string | undefined;
   const nonInteractive = !!parsed.flags.yes;
 
-  const configFlag = parsed.flags.config as string | undefined;
-  let configPath: string | undefined;
-  if (configFlag) {
-    configPath = configFlag;
-  } else if (projectArg) {
-    const resolved = await resolveProjectsByName([projectArg], lang);
-    configPath = resolved?.[0]?.configPath;
-  } else if (!nonInteractive) {
-    const picked = await promptSelectProject(lang);
-    if (!picked) {
-      console.error(t("common.cancelled", lang));
-      process.exitCode = 1;
-      return;
-    }
-    configPath = picked.configPath;
+  let configPath: string | null;
+  try {
+    configPath = await resolveConfigPathFromArgs(parsed, lang, {
+      interactive: !nonInteractive,
+      projectArgIndex: 0,
+    });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
   }
 
   if (!configPath) {
-    console.error(t("project.noneFound", lang));
+    console.error(!nonInteractive ? t("common.cancelled", lang) : t("project.noneFound", lang));
     process.exitCode = 1;
     return;
   }

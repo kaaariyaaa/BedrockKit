@@ -5,7 +5,7 @@ import { select, isCancel, confirm } from "@clack/prompts";
 import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
-import { promptSelectProjects, resolveProjectsByName } from "../core/projects.js";
+import { resolveProjectsFromArgs } from "../core/projects.js";
 import type { CommandContext } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
@@ -37,18 +37,15 @@ export async function handleSync(ctx: CommandContext): Promise<void> {
     }
     shouldBuild = !!buildChoice;
   }
-  const projectsArg =
-    parsed.positional.length > 0
-      ? parsed.positional.map(String)
-      : typeof parsed.flags.project === "string"
-        ? String(parsed.flags.project).split(",").map((s) => s.trim()).filter(Boolean)
-        : [];
-  let projects =
-    projectsArg.length > 0
-      ? await resolveProjectsByName(projectsArg, lang)
-      : interactive
-        ? await promptSelectProjects(lang, { initialAll: true })
-        : [];
+
+  let projects: Awaited<ReturnType<typeof resolveProjectsFromArgs>>;
+  try {
+    projects = await resolveProjectsFromArgs(parsed, lang, { interactive, initialAll: true });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
 
   if (projects === null) {
     console.error(t("common.cancelled", lang));
