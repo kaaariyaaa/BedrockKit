@@ -556,8 +556,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
           await handleSync({
             ...ctx,
             argv: [
-              "--config",
-              proj.configPath,
+              proj.name,
               "--build=false",
               "--build-dir",
               outDirOverride,
