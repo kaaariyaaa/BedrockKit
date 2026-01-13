@@ -537,6 +537,10 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "[{name}] 監視中: {paths}",
     en: "[{name}] watching {paths}",
   },
+  "watch.uptime": {
+    ja: "watch 起動時間: {time}",
+    en: "watch uptime: {time}",
+  },
   "watch.finalizeUnlinkFailed": {
     ja: "[{name}] 終了時のリンク解除に失敗しました: {error}",
     en: "[{name}] finalize unlink failed: {error}",
