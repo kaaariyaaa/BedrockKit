@@ -10,6 +10,6 @@ export function createLogger(opts: { quiet?: boolean; json?: boolean } = {}): Lo
   return {
     info: silent ? noop : console.log,
     warn: silent ? noop : console.warn,
-    error: console.error,
+    error: silent ? noop : console.error,
   };
 }

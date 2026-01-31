@@ -17,7 +17,10 @@ const pkg = JSON.parse(
 ) as { version?: string };
 
 export function printBanner(lang: Lang) {
-  console.clear();
+  // Only clear console in interactive TTY mode to avoid breaking CI/CD logs
+  if (process.stdout.isTTY && process.env.BKIT_NO_CLEAR !== "1") {
+    console.clear();
+  }
   
   // Huge ASCII Art
   const art = figlet.textSync('BEDROCK KIT', {

@@ -25,6 +25,10 @@ export async function writeJson(path: string, data: unknown): Promise<void> {
 
 export function isDirEmpty(path: string): boolean {
   if (!existsSync(path)) return true;
-  const entries = readdirSync(path);
-  return entries.length === 0;
+  try {
+    const entries = readdirSync(path);
+    return entries.length === 0;
+  } catch {
+    return true;
+  }
 }

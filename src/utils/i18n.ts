@@ -1145,6 +1145,9 @@ const dict: Record<string, Record<Lang, string>> = {
 
 export function t(key: string, lang: Lang = "ja", params: Record<string, string> = {}): string {
   const entry = dict[key];
+  if (!entry && process.env.NODE_ENV !== "production") {
+    console.warn(`[i18n] Missing translation key: ${key}`);
+  }
   const base = entry ? entry[lang] ?? entry.ja ?? key : key;
   return Object.keys(params).reduce(
     (acc, k) => acc.replace(new RegExp(`\\{${k}\\}`, "g"), params[k] ?? ""),

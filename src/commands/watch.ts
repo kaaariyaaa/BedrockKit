@@ -527,10 +527,16 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   }
   buildMode = buildMode ?? "copy";
 
+  const watchers: ReturnType<typeof chokidar.watch>[] = [];
+
   let cleanupRequested = false;
   const finalizeAndExit = async () => {
     if (cleanupRequested) return;
     cleanupRequested = true;
+    // Close all file watchers to prevent resource leaks
+    for (const watcher of watchers) {
+      await watcher.close();
+    }
     if (buildMode === "link") {
       log(t("watch.finalizeNotice", lang));
       await finalizeWatchBuilds(selectedProjects, outDirOverride, lang);
@@ -581,6 +587,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
       ignored: ["**/dist/**", "**/.watch-dist/**", "**/node_modules/**"],
       ignoreInitial: true,
     });
+    watchers.push(watcher);
     let pending = false;
     const trigger = async (reason: string) => {
       if (pending) return;
