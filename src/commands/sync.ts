@@ -1,7 +1,7 @@
 import { cp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { select, isCancel, confirm } from "@clack/prompts";
+import { select, isCancel, confirm } from "../tui/prompts.js";
 import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";

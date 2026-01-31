@@ -1,4 +1,4 @@
-import { confirm, isCancel, select, text } from "@clack/prompts";
+import { confirm, isCancel, select, text } from "../tui/prompts.js";
 import {
   loadTemplateRegistry,
   saveTemplateRegistry,

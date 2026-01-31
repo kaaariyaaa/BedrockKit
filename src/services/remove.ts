@@ -1,6 +1,6 @@
 import { rm, lstat, readdir, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
-import { confirm, isCancel, select } from "@clack/prompts";
+import { confirm, isCancel, select } from "../tui/prompts.js";
 import { loadConfigContext } from "../core/config.js";
 import type { Lang } from "../types.js";
 import type { ParsedArgsLike, ProjectInfo } from "../core/projects.js";

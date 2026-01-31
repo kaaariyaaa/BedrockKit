@@ -1,4 +1,4 @@
-import { isCancel, select, text } from "@clack/prompts";
+import { isCancel, select, text } from "../tui/prompts.js";
 import { fetchNpmVersionChannels, formatVersionLabel } from "../utils/npm.js";
 import { t } from "../utils/i18n.js";
 import type { Lang, ScriptApiSelection, ScriptApiVersionMap } from "../types.js";

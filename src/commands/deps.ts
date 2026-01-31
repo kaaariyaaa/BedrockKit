@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { multiselect, isCancel, outro } from "@clack/prompts";
+import { multiselect, isCancel, outro } from "../tui/prompts.js";
 import type { Manifest } from "../core/manifest.js";
 import { loadConfigContext } from "../core/config.js";
 import { resolveConfigPathFromArgs } from "../core/projects.js";

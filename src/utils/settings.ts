@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, isAbsolute, relative, normalize } from "node:path";
 import { homedir } from "node:os";
-import { select, text, isCancel, intro, outro } from "@clack/prompts";
+import { select, text, isCancel, intro, outro } from "../tui/prompts.js";
 import type { Lang } from "../types.js";
 import { resolveLang, t } from "./i18n.js";
 

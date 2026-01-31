@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve, extname, dirname, relative, basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { isCancel, select } from "@clack/prompts";
+import { isCancel, select } from "../tui/prompts.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import type { BkitConfig, Lang } from "../types.js";
 import { pathExists } from "../utils/fs.js";

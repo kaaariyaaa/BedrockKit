@@ -2,7 +2,7 @@ import { cp, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { dirname, extname, join, resolve, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
-import { confirm, intro, isCancel, outro, spinner, text } from "@clack/prompts";
+import { confirm, intro, isCancel, outro, spinner, text } from "../tui/prompts.js";
 import type { BkitConfig, CommandContext, ScriptDependency } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists, writeJson } from "../utils/fs.js";

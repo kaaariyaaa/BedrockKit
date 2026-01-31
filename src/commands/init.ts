@@ -8,7 +8,7 @@ import {
   text,
   multiselect,
   log, // Import log
-} from "@clack/prompts";
+} from "../tui/prompts.js";
 import pc from "picocolors";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";

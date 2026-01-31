@@ -1,6 +1,6 @@
 import chokidar from "chokidar";
 import { resolve, join, dirname } from "node:path";
-import { intro, outro, multiselect, isCancel, select } from "@clack/prompts";
+import { intro, outro, multiselect, isCancel, select } from "../tui/prompts.js";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
 import type { CommandContext, Lang } from "../types.js";

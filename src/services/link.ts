@@ -1,6 +1,6 @@
 import { lstat, rm, symlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { confirm, isCancel, multiselect, select } from "@clack/prompts";
+import { confirm, isCancel, multiselect, select } from "../tui/prompts.js";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
 import type { Lang } from "../types.js";
