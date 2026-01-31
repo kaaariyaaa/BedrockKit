@@ -377,6 +377,11 @@ export async function handleImport(ctx: CommandContext): Promise<void> {
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     process.exitCode = 1;
+  } finally {
+    // Ensure temporary directory is cleaned up even on failure
+    if (typeof tmp === "string") {
+      await rm(tmp, { recursive: true, force: true }).catch(() => {});
+    }
   }
 }
 

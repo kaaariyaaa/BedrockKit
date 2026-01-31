@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { resolve, isAbsolute } from "node:path";
+import { resolve, isAbsolute, relative, normalize } from "node:path";
 import { homedir } from "node:os";
 import { select, text, isCancel, intro, outro } from "@clack/prompts";
 import type { Lang } from "../types.js";
@@ -23,15 +23,41 @@ export type Settings = {
 };
 
 const userHome = process.env.USERPROFILE ?? homedir();
+
+// Sanitize path to prevent path traversal attacks
+function sanitizePath(input: string, baseDir: string): string {
+  const normalized = normalize(input);
+  const resolved = isAbsolute(normalized)
+    ? normalized
+    : resolve(baseDir, normalized);
+
+  // Prevent path traversal outside of base directory
+  const rel = relative(baseDir, resolved);
+  if (rel.startsWith("..") || rel.includes("../") || rel.includes("..\\")) {
+    throw new Error(`Invalid path: path traversal detected in "${input}"`);
+  }
+
+  return resolved;
+}
+
 const settingsDir = process.env.BKIT_SETTINGS_DIR
-  ? resolve(process.env.BKIT_SETTINGS_DIR)
+  ? sanitizePath(process.env.BKIT_SETTINGS_DIR, userHome)
   : resolve(userHome, ".bkit");
 const settingsPath = resolve(settingsDir, "settings.json");
 
 export async function loadSettings(): Promise<Settings> {
   try {
     const raw = await readFile(settingsPath, "utf8");
-    return JSON.parse(raw) as Settings;
+    try {
+      return JSON.parse(raw) as Settings;
+    } catch (parseError) {
+      console.error(
+        `Failed to parse settings file at ${settingsPath}: ${
+          parseError instanceof Error ? parseError.message : String(parseError)
+        }`
+      );
+      return {};
+    }
   } catch {
     return {};
   }
@@ -148,5 +174,12 @@ export function resolveProjectRoot(settings?: Settings): string {
       ? (settings as unknown as { projectRoot?: string }).projectRoot
       : undefined;
   const raw = settings?.projectRoot?.path ?? legacyRoot ?? "project";
-  return isAbsolute(raw) ? raw : resolve(userHome, raw);
+
+  // Validate and sanitize the path to prevent path traversal
+  try {
+    return isAbsolute(raw) ? raw : sanitizePath(raw, userHome);
+  } catch (error) {
+    console.warn(`Invalid projectRoot path "${raw}", using default: ${error}`);
+    return resolve(userHome, "project");
+  }
 }

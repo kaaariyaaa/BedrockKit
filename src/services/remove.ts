@@ -1,4 +1,4 @@
-import { rm, lstat, readdir } from "node:fs/promises";
+import { rm, lstat, readdir, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { confirm, isCancel, select } from "@clack/prompts";
 import { loadConfigContext } from "../core/config.js";
@@ -15,9 +15,36 @@ import { resolveTargetPaths, type SyncTargetConfig } from "./sync-targets.js";
 
 async function removeSymlinkEntries(rootDir: string): Promise<void> {
   const stack = [rootDir];
+  const visited = new Set<string>(); // Track visited paths to prevent infinite loops
+  let visitCount = 0;
+  const MAX_VISITS = 10000; // Prevent runaway traversal
+
   while (stack.length) {
     const current = stack.pop();
     if (!current) continue;
+
+    // Check for circular references
+    try {
+      const realPath = await realpath(current);
+      if (visited.has(realPath)) {
+        console.warn(`Circular reference detected, skipping: ${current}`);
+        continue;
+      }
+      visited.add(realPath);
+    } catch {
+      // If realpath fails, use the current path
+      if (visited.has(current)) {
+        continue;
+      }
+      visited.add(current);
+    }
+
+    // Prevent excessive traversal
+    visitCount++;
+    if (visitCount > MAX_VISITS) {
+      throw new Error(`Maximum directory traversal limit (${MAX_VISITS}) exceeded`);
+    }
+
     const entries = await readdir(current, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = resolve(current, entry.name);

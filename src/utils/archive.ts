@@ -1,21 +1,44 @@
 import { spawn } from "node:child_process";
 import { platform } from "node:os";
+import { resolve } from "node:path";
+
+// Validate path to prevent command injection
+function validatePath(input: string): string {
+  // Remove dangerous characters that could be used for command injection
+  const sanitized = input.replace(/["`$;|&<>\x00-\x1f]/g, "");
+  // Resolve to absolute path
+  return resolve(sanitized);
+}
 
 export function zipDirectory(srcDir: string, outFile: string): Promise<void> {
   const isWin = platform() === "win32";
-  return new Promise((resolve, reject) => {
-    const cmd = isWin ? "powershell" : "zip";
-    const args = isWin
-      ? [
-          "-NoProfile",
-          "-Command",
-          `Compress-Archive -Path "${srcDir}\\*" -DestinationPath "${outFile}" -Force`,
-        ]
-      : ["-r", outFile, "."];
+  const safeSrcDir = validatePath(srcDir);
+  const safeOutFile = validatePath(outFile);
 
-    const options = isWin
-      ? { stdio: "inherit" as const }
-      : { cwd: srcDir, stdio: "inherit" as const };
+  return new Promise((resolve, reject) => {
+    let cmd: string;
+    let args: string[];
+    let options: { cwd?: string; stdio: "inherit" };
+
+    if (isWin) {
+      cmd = "powershell";
+      // Use -LiteralPath to handle special characters safely
+      args = [
+        "-NoProfile",
+        "-Command",
+        "Compress-Archive",
+        "-LiteralPath",
+        `${safeSrcDir}\\*`,
+        "-DestinationPath",
+        safeOutFile,
+        "-Force",
+      ];
+      options = { stdio: "inherit" };
+    } else {
+      cmd = "zip";
+      args = ["-r", safeOutFile, "."];
+      options = { cwd: safeSrcDir, stdio: "inherit" };
+    }
 
     const child = spawn(cmd, args, options);
     child.on("error", (err) => reject(err));
