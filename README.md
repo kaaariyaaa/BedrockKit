@@ -5,7 +5,7 @@ Minecraft Bedrock Edition 向けのアドオン／リソースパック開発を
 [English version is here](./README.en.md)
 
 ## 動作要件
-- **Bun**: 1.1 以上（CLI 実行用）
+- **Bun**: 1.1 以上（CLI 実行用。PATH に `bun`/`bun.exe` が必要）
 - **Node.js**: 20 以上（ビルドや周辺ツール用）
 - **npm / git**: テンプレート取得や依存インストールに使用
 - **OS**: Windows / macOS / Linux いずれでも利用可能。Sync でゲームの開発用フォルダへコピーする際は、対象環境に合わせた権限が必要です。

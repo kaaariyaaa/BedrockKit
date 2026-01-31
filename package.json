@@ -4,7 +4,7 @@
   "description": "BedrockKit CLI for Bedrock addon/resource pack workflows",
   "type": "module",
   "bin": {
-    "bkit": "./dist/cli.js"
+    "bkit": "./dist/launcher.js"
   },
   "files": [
     "dist/",

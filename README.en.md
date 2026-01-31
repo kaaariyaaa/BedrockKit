@@ -5,7 +5,7 @@ A CLI tool for all-in-one Minecraft Bedrock Edition addon/resource pack developm
 [日本語版はこちら (Japanese version is here)](./README.md)
 
 ## Requirements
-- **Bun**: 1.1 or higher (to run the CLI)
+- **Bun**: 1.1 or higher (to run the CLI; `bun`/`bun.exe` must be on PATH)
 - **Node.js**: 20 or higher (builds and related tools)
 - **npm / git**: Used for template fetching and dependency installation
 - **OS**: Compatible with Windows, macOS, and Linux. Appropriate permissions are required when syncing to game development folders.
