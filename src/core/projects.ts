@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { isCancel, multiselect, select } from "@clack/prompts";
+import { isCancel, multiselect, select } from "../tui/prompts.js";
 import type { Lang } from "../types.js";
 import { loadSettings, resolveProjectRoot } from "../utils/settings.js";
 import { pathExists } from "../utils/fs.js";

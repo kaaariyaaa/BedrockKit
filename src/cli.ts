@@ -1,9 +1,9 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { intro, isCancel, outro, select } from "@clack/prompts";
+import { intro, isCancel, outro, select } from "./tui/prompts.js";
 import pc from "picocolors";
 import { buildCommands } from "./commands/index.js";
 import { printBanner, printCommandHeader } from "./utils/ui.js";
@@ -98,6 +98,7 @@ async function main(): Promise<void> {
     return;
   }
   const lang = resolveLang(langFlag, settings.lang?.value);
+  process.env.BKIT_LANG = lang;
 
   // Update check (prompt only when TTY)
   const pkgName = pkg.name ?? "@bedrockkit/cli";

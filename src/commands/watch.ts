@@ -1,6 +1,6 @@
 import chokidar from "chokidar";
 import { resolve, join, dirname } from "node:path";
-import { intro, outro, multiselect, isCancel, select } from "@clack/prompts";
+import { intro, outro, multiselect, isCancel, select } from "../tui/prompts.js";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
 import type { CommandContext, Lang } from "../types.js";
@@ -13,6 +13,8 @@ import { resolveLang, t } from "../utils/i18n.js";
 import { getSettingsPath, loadSettings, resolveProjectRoot } from "../utils/settings.js";
 import { createRequire } from "node:module";
 import { loadIgnoreRules, isIgnored } from "../utils/ignore.js";
+import pc from "picocolors";
+import readline from "node:readline";
 
 type ProjectEntry = { name: string; configPath: string };
 type WatchState = {
@@ -32,6 +34,17 @@ type SyncTargetConfig = {
 const watchStatePath = resolve(dirname(getSettingsPath()), "watch-link.json");
 const DEVELOPMENT_BEHAVIOR = "development_behavior_packs";
 const DEVELOPMENT_RESOURCE = "development_resource_packs";
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
 
 async function discoverProjects(cwd: string): Promise<ProjectEntry[]> {
   const settings = await loadSettings();
@@ -421,7 +434,35 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
     (typeof parsed.flags.outdir === "string" && parsed.flags.outdir) ||
     ".watch-dist";
   const quiet = !!parsed.flags.quiet || !!parsed.flags.q;
-  const { info: log } = createLogger({ quiet });
+  const logger = createLogger({ quiet });
+  const baseLog = logger.info;
+  const startAt = Date.now();
+  const isTty = !!process.stdout.isTTY;
+  let uptimeTimer: NodeJS.Timeout | null = null;
+
+  const renderUptimeInline = () => {
+    const time = formatDuration(Date.now() - startAt);
+    const msg = pc.dim(t("watch.uptime", lang, { time }));
+    readline.clearLine(process.stdout, 0);
+    readline.cursorTo(process.stdout, 0);
+    process.stdout.write(msg);
+  };
+  const stopUptime = () => {
+    if (uptimeTimer) clearInterval(uptimeTimer);
+    uptimeTimer = null;
+    if (isTty) process.stdout.write("\n");
+  };
+
+  const log = (msg: string) => {
+    if (!quiet && isTty) {
+      // Ensure the uptime line stays "pinned" as the last line.
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0);
+      process.stdout.write("\n");
+    }
+    baseLog(msg);
+    if (!quiet && isTty) renderUptimeInline();
+  };
 
   await recoverFromWatchState(log, outDirOverride, lang);
 
@@ -486,10 +527,16 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   }
   buildMode = buildMode ?? "copy";
 
+  const watchers: ReturnType<typeof chokidar.watch>[] = [];
+
   let cleanupRequested = false;
   const finalizeAndExit = async () => {
     if (cleanupRequested) return;
     cleanupRequested = true;
+    // Close all file watchers to prevent resource leaks
+    for (const watcher of watchers) {
+      await watcher.close();
+    }
     if (buildMode === "link") {
       log(t("watch.finalizeNotice", lang));
       await finalizeWatchBuilds(selectedProjects, outDirOverride, lang);
@@ -511,6 +558,21 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   intro(t("watch.intro", lang));
   log(t("watch.outDir", lang, { outDir: outDirOverride, mode: buildMode }));
 
+  if (!quiet) {
+    if (isTty) {
+      renderUptimeInline();
+      uptimeTimer = setInterval(renderUptimeInline, 1000);
+    } else {
+      uptimeTimer = setInterval(() => {
+        const time = formatDuration(Date.now() - startAt);
+        baseLog(t("watch.uptime", lang, { time }));
+      }, 60_000);
+    }
+    process.once("SIGINT", stopUptime);
+    process.once("SIGTERM", stopUptime);
+    process.once("exit", stopUptime);
+  }
+
   for (const proj of selectedProjects) {
     const configCtx = await loadConfigContext(proj.configPath);
     const { config, rootDir } = configCtx;
@@ -525,6 +587,7 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
       ignored: ["**/dist/**", "**/.watch-dist/**", "**/node_modules/**"],
       ignoreInitial: true,
     });
+    watchers.push(watcher);
     let pending = false;
     const trigger = async (reason: string) => {
       if (pending) return;

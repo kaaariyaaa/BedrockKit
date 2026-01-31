@@ -1,11 +1,12 @@
 # BedrockKit
 
-A CLI tool for all-in-one Minecraft Bedrock Edition addon/resource pack development. Manage initialization, dependency management, building, packaging, and syncing to your development environment with the `bkit` command.
+A CLI tool for all-in-one Minecraft Bedrock Edition addon/resource pack development. Manage initialization, dependency management, building, packaging, and syncing to your development environment with the `bkit` command. The interactive UI is powered by OpenTUI.
 
 [日本語版はこちら (Japanese version is here)](./README.md)
 
 ## Requirements
-- **Node.js**: 20 or higher
+- **Bun**: 1.1 or higher (to run the CLI)
+- **Node.js**: 20 or higher (builds and related tools)
 - **npm / git**: Used for template fetching and dependency installation
 - **OS**: Compatible with Windows, macOS, and Linux. Appropriate permissions are required when syncing to game development folders.
 
@@ -26,7 +27,7 @@ npm run build
 npm install -g .   # or "npm link" for local linking
 ```
 
-For direct testing from source during development, you can run `src/cli.ts` using `npm run dev -- <command>`.
+For direct testing from source during development, run `src/cli.ts` with `bun run src/cli.ts -- <command>`.
 
 ## Quick Start
 ```bash
@@ -42,6 +43,10 @@ bkit sync <project>
 # Create .mcpack/.mcaddon for distribution
 bkit package <project>
 ```
+
+## Terminal UI
+- Uses OpenTUI for interactive flows (TTY only).
+- Non-interactive flags (`--yes`, `--json`, `--quiet`) keep output minimal.
 
 ## Example Structure
 The standard structure created by `bkit create` is as follows:

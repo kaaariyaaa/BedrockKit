@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve, extname, dirname, relative, basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { isCancel, select } from "@clack/prompts";
+import { isCancel, select } from "../tui/prompts.js";
 import { resolveLang, t } from "../utils/i18n.js";
 import type { BkitConfig, Lang } from "../types.js";
 import { pathExists } from "../utils/fs.js";
@@ -26,15 +26,31 @@ export async function loadConfig(path: string = defaultConfigPath): Promise<Bkit
   const ext = extname(path).toLowerCase();
   if (ext === ".json") {
     const raw = await readFile(path, { encoding: "utf8" });
-    return JSON.parse(raw) as BkitConfig;
+    try {
+      return JSON.parse(raw) as BkitConfig;
+    } catch (parseError) {
+      throw new Error(
+        `Invalid JSON in config file ${path}: ${
+          parseError instanceof Error ? parseError.message : String(parseError)
+        }`
+      );
+    }
   }
 
-  const mod = await import(pathToFileURL(path).href);
-  const cfg = (mod.default ?? mod.config ?? mod) as BkitConfig;
-  if (!cfg) {
-    throw new Error(`Config module did not export a config object: ${path}`);
+  try {
+    const mod = await import(pathToFileURL(path).href);
+    const cfg = (mod.default ?? mod.config ?? mod) as BkitConfig;
+    if (!cfg) {
+      throw new Error(`Config module did not export a config object: ${path}`);
+    }
+    return cfg;
+  } catch (importError) {
+    throw new Error(
+      `Failed to import config from ${path}: ${
+        importError instanceof Error ? importError.message : String(importError)
+      }`
+    );
   }
-  return cfg;
 }
 
 export function validateConfig(config: BkitConfig): string[] {

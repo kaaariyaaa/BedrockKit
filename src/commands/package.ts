@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { stat } from "node:fs/promises";
-import { confirm, isCancel } from "@clack/prompts";
+import { confirm, isCancel } from "../tui/prompts.js";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
 import { resolveConfigPathFromArgs } from "../core/projects.js";

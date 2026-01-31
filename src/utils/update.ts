@@ -21,6 +21,8 @@ export function compareSemver(a: string, b: string): number {
   return 0;
 }
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 export async function checkForUpdate(
   pkgName: string,
   current: string,
@@ -28,7 +30,12 @@ export async function checkForUpdate(
 ): Promise<UpdateCheck | null> {
   try {
     const encoded = encodeURIComponent(pkgName);
-    const res = await fetch(`https://registry.npmjs.org/${encoded}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const res = await fetch(`https://registry.npmjs.org/${encoded}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
     if (!res.ok) return null;
     const data = (await res.json()) as { "dist-tags"?: { latest?: string } };
     const latest = data["dist-tags"]?.latest;

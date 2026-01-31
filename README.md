@@ -1,11 +1,12 @@
 # BedrockKit
 
-Minecraft Bedrock Edition 向けのアドオン／リソースパック開発を一括で回すための CLI です。初期化・依存管理・ビルド・配布パッケージ作成・開発環境への同期までを `bkit` コマンドで扱えます。
+Minecraft Bedrock Edition 向けのアドオン／リソースパック開発を一括で回すための CLI です。初期化・依存管理・ビルド・配布パッケージ作成・開発環境への同期までを `bkit` コマンドで扱えます。対話UIは OpenTUI ベースです。
 
 [English version is here](./README.en.md)
 
 ## 動作要件
-- **Node.js**: 20 以上
+- **Bun**: 1.1 以上（CLI 実行用）
+- **Node.js**: 20 以上（ビルドや周辺ツール用）
 - **npm / git**: テンプレート取得や依存インストールに使用
 - **OS**: Windows / macOS / Linux いずれでも利用可能。Sync でゲームの開発用フォルダへコピーする際は、対象環境に合わせた権限が必要です。
 
@@ -26,7 +27,7 @@ npm run build
 npm install -g .   # もしくは npm link でローカルリンク
 ```
 
-開発中にソースから直接試す場合は `npm run dev -- <command>` で `src/cli.ts` を起動できます。
+開発中にソースから直接試す場合は `bun run src/cli.ts -- <command>` で起動できます。
 
 ## クイックスタート
 ```bash
@@ -42,6 +43,10 @@ bkit sync <project>
 # 配布用 .mcpack/.mcaddon を作成
 bkit package <project>
 ```
+
+## 端末UIについて
+- OpenTUI ベースの対話画面を使用します（TTY で有効）。
+- 非対話フラグ（`--yes` など）や `--json` / `--quiet` 利用時は最小の出力で動作します。
 
 ## 生成される構成例
 `bkit create` で作られる標準構成は次のとおりです。

@@ -1,4 +1,4 @@
-import { select, isCancel } from "@clack/prompts";
+import { select, isCancel } from "../tui/prompts.js";
 import { resolve } from "node:path";
 import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
