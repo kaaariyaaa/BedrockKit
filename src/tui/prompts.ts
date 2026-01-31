@@ -5,9 +5,12 @@ import {
   InputRenderableEvents,
   SelectRenderable,
   SelectRenderableEvents,
+  StyledText,
   TextRenderable,
+  fg,
   type KeyEvent,
 } from "@opentui/core";
+import figlet from "figlet";
 
 type CancelSymbol = typeof CANCEL;
 
@@ -91,6 +94,7 @@ async function withRenderer<T>(fn: (renderer: Awaited<ReturnType<typeof createCl
 function setupLayout(renderer: Awaited<ReturnType<typeof createCliRenderer>>, message: string) {
   const lang = getUiLang();
   const text = uiText(lang);
+  const banner = buildBedrockBanner("BEDROCKKIT");
 
   const container = new BoxRenderable(renderer, {
     id: "prompt-root",
@@ -105,8 +109,8 @@ function setupLayout(renderer: Awaited<ReturnType<typeof createCliRenderer>>, me
 
   const title = new TextRenderable(renderer, {
     id: "prompt-title",
-    content: text.title,
-    fg: "#7aa2f7",
+    content: banner,
+    wrapMode: "none",
   });
 
   const msg = new TextRenderable(renderer, {
@@ -135,6 +139,41 @@ function setupLayout(renderer: Awaited<ReturnType<typeof createCliRenderer>>, me
   renderer.root.add(container);
 
   return { container, body, footer, text };
+}
+
+function buildBedrockBanner(label: string): StyledText {
+  const palette = [
+    "#1f1f1f",
+    "#2b2b2b",
+    "#3a3a3a",
+    "#4a4a4a",
+    "#5a5a5a",
+    "#6b6b6b",
+    "#7a7a7a",
+  ];
+
+  const rendered = figlet.textSync(label, {
+    font: "Tinker-Toy",
+    horizontalLayout: "default",
+    verticalLayout: "default",
+  });
+  const artLines = rendered.split(/\r?\n/).filter((line) => line.length > 0);
+
+  const chunks: StyledText["chunks"] = [];
+  for (let row = 0; row < artLines.length; row += 1) {
+    const line = artLines[row]!;
+    for (let col = 0; col < line.length; col += 1) {
+      const ch = line[col] ?? " ";
+      const idx = (row * 131 + col * 17) % palette.length;
+      const color = palette[idx]!;
+      chunks.push(fg(color)(ch));
+    }
+    if (row < artLines.length - 1) {
+      chunks.push(fg(palette[row % palette.length]!)("\n"));
+    }
+  }
+
+  return new StyledText(chunks);
 }
 
 function fallbackSelect<T>(options: SelectOption<T>[], initialValue?: T): T | CancelSymbol {
