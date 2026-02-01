@@ -22,9 +22,9 @@
   "homepage": "https://github.com/kaaariyaaa/BedrockKit#readme",
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "bunx tsc -p tsconfig.json",
     "lint": "echo \"(todo) add lint\"",
-    "test": "npm run build && node --test"
+    "test": "bun run build && bun test"
   },
   "keywords": [
     "minecraft",
@@ -35,7 +35,6 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=20",
     "bun": ">=1.1.0"
   },
   "devDependencies": {

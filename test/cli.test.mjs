@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, beforeAll } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -117,123 +117,127 @@ async function scaffoldProject(projectRoot) {
   );
 }
 
-test("CLI commands (smoke tests)", async (t) => {
-  const cwd = await makeTempWorkspace(true);
-  const projectDir = resolve(cwd, "project", "sample-addon");
-  const configPath = resolve(projectDir, "bkit.config.json");
+let sharedCwd = "";
+let projectDir = "";
+let configPath = "";
 
-  await t.test("version", async () => {
-    const res = runCli(["--version"], cwd);
-    assert.equal(res.status, 0);
-    assert.match(res.stdout.trim(), /^\d+\.\d+\.\d+$/);
-  });
+beforeAll(async () => {
+  sharedCwd = await makeTempWorkspace(true);
+  projectDir = resolve(sharedCwd, "project", "sample-addon");
+  configPath = resolve(projectDir, "bkit.config.json");
+});
 
-  await t.test("help", async () => {
-    const res = runCli(["--help"], cwd);
-    assert.equal(res.status, 0);
-    assert.ok(/Commands|コマンド/.test(res.stdout));
-  });
+test("version", async () => {
+  const res = runCli(["--version"], sharedCwd);
+  assert.equal(res.status, 0);
+  assert.match(res.stdout.trim(), /^\d+\.\d+\.\d+$/);
+});
 
-  await t.test("help command", async () => {
-    const res = runCli(["help"], cwd);
-    assert.equal(res.status, 0);
-  });
+test("help", async () => {
+  const res = runCli(["--help"], sharedCwd);
+  assert.equal(res.status, 0);
+  assert.ok(/Commands|コマンド/.test(res.stdout));
+});
 
-  await t.test("create (non-interactive)", async () => {
-    const res = runCli(
-      ["create", "--yes", "--skip-install", "--no-script", "--name", "init-addon"],
-      cwd,
-    );
-    assert.equal(res.status, 0);
-  });
+test("help command", async () => {
+  const res = runCli(["help"], sharedCwd);
+  assert.equal(res.status, 0);
+});
 
-  await t.test("build", async () => {
-    const res = runCli(["build", "sample-addon", "--quiet"], cwd);
-    assert.equal(res.status, 0);
-  });
+test("create (non-interactive)", async () => {
+  const res = runCli(
+    ["create", "--yes", "--skip-install", "--no-script", "--name", "init-addon"],
+    sharedCwd,
+  );
+  assert.equal(res.status, 0);
+});
 
-  await t.test("package", async () => {
-    const res = runCli(["package", "sample-addon", "--build=false", "--quiet"], cwd);
-    assert.equal(res.status, 0);
-  });
+test("build", async () => {
+  const res = runCli(["build", "sample-addon", "--quiet"], sharedCwd);
+  assert.equal(res.status, 0);
+});
 
-  await t.test("sync (dry-run)", async () => {
-    const res = runCli(["sync", "sample-addon", "--dry-run", "--quiet"], cwd);
-    assert.equal(res.status, 0);
-  });
+test("package", async () => {
+  const res = runCli(["package", "sample-addon", "--build=false", "--quiet"], sharedCwd);
+  assert.equal(res.status, 0);
+});
 
-  await t.test("link (dry-run)", async () => {
-    const res = runCli(
-      [
-        "link",
-        "sample-addon",
-        "--target",
-        "local",
-        "--source",
-        "packs",
-        "--mode",
-        "junction",
-        "--behavior",
-        "--resource",
-        "--dry-run",
-        "--on-existing",
-        "skip",
-        "--quiet",
-      ],
-      cwd,
-    );
-    assert.equal(res.status, 0);
-  });
+test("sync (dry-run)", async () => {
+  const res = runCli(["sync", "sample-addon", "--dry-run", "--quiet"], sharedCwd);
+  assert.equal(res.status, 0);
+});
 
-  await t.test("validate", async () => {
-    const res = runCli(["validate", "sample-addon", "--json"], cwd);
-    assert.equal(res.status, 0);
-  });
+test("link (dry-run)", async () => {
+  const res = runCli(
+    [
+      "link",
+      "sample-addon",
+      "--target",
+      "local",
+      "--source",
+      "packs",
+      "--mode",
+      "junction",
+      "--behavior",
+      "--resource",
+      "--dry-run",
+      "--on-existing",
+      "skip",
+      "--quiet",
+    ],
+    sharedCwd,
+  );
+  assert.equal(res.status, 0);
+});
 
-  await t.test("bump", async () => {
-    const res = runCli(["bump", "sample-addon", "patch", "--yes"], cwd);
-    assert.equal(res.status, 0);
-    const updated = JSON.parse(await readFile(configPath, "utf8"));
-    assert.equal(updated.project.version, "1.0.1");
-  });
+test("validate", async () => {
+  const res = runCli(["validate", "sample-addon", "--json"], sharedCwd);
+  assert.equal(res.status, 0);
+});
 
-  await t.test("deps (expected failure without script)", async () => {
-    const res = runCli(["deps", "sample-addon"], cwd);
-    assert.notEqual(res.status, 0);
-  });
+test("bump", async () => {
+  const res = runCli(["bump", "sample-addon", "patch", "--yes"], sharedCwd);
+  assert.equal(res.status, 0);
+  const updated = JSON.parse(await readFile(configPath, "utf8"));
+  assert.equal(updated.project.version, "1.0.1");
+});
 
-  await t.test("import (expected failure)", async () => {
-    const res = runCli(["import", "missing.zip"], cwd);
-    assert.notEqual(res.status, 0);
-  });
+test("deps (expected failure without script)", async () => {
+  const res = runCli(["deps", "sample-addon"], sharedCwd);
+  assert.notEqual(res.status, 0);
+});
 
-  await t.test("template list", async () => {
-    const res = runCli(["template", "list"], cwd);
-    assert.equal(res.status, 0);
-  });
+test("import (expected failure)", async () => {
+  const res = runCli(["import", "missing.zip"], sharedCwd);
+  assert.notEqual(res.status, 0);
+});
 
-  await t.test("setting --lang", async () => {
-    const res = runCli(["setting", "--lang", "en"], cwd);
-    assert.equal(res.status, 0);
-  });
+test("template list", async () => {
+  const res = runCli(["template", "list"], sharedCwd);
+  assert.equal(res.status, 0);
+});
 
-  await t.test("remove --yes", async () => {
-    const removeCwd = await makeTempWorkspace(true);
-    const removeProject = resolve(removeCwd, "project", "sample-addon");
-    const res = runCli(["remove", "--project", "sample-addon", "--yes"], removeCwd);
-    assert.equal(res.status, 0);
-    let exists = true;
-    try {
-      await stat(removeProject);
-    } catch {
-      exists = false;
-    }
-    assert.equal(exists, false);
-  });
+test("setting --lang", async () => {
+  const res = runCli(["setting", "--lang", "en"], sharedCwd);
+  assert.equal(res.status, 0);
+});
 
-  await t.test("watch (no projects)", async () => {
-    const empty = await makeTempWorkspace(false);
-    const res = runCli(["watch"], empty);
-    assert.equal(res.status, 0);
-  });
+test("remove --yes", async () => {
+  const removeCwd = await makeTempWorkspace(true);
+  const removeProject = resolve(removeCwd, "project", "sample-addon");
+  const res = runCli(["remove", "--project", "sample-addon", "--yes"], removeCwd);
+  assert.equal(res.status, 0);
+  let exists = true;
+  try {
+    await stat(removeProject);
+  } catch {
+    exists = false;
+  }
+  assert.equal(exists, false);
+});
+
+test("watch (no projects)", async () => {
+  const empty = await makeTempWorkspace(false);
+  const res = runCli(["watch"], empty);
+  assert.equal(res.status, 0);
 });
