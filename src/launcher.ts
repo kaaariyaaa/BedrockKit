@@ -3,6 +3,8 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { resolveLang, t } from "./utils/i18n.js";
+import type { Lang } from "./types.js";
 
 type SpawnCandidate = {
   cmd: string;
@@ -37,13 +39,40 @@ function resolveBunExecutable(): SpawnCandidate | null {
   return null;
 }
 
-function main(): void {
-  const bun = resolveBunExecutable();
+function resolveFromPathProbe(): SpawnCandidate | null {
+  if (isWindows()) {
+    const probe = spawnSync("where.exe", ["bun"], { stdio: "pipe" });
+    if (probe.status !== 0) return null;
+    const out = String(probe.stdout ?? "").trim();
+    const first = out.split(/\r?\n/)[0];
+    if (!first) return null;
+    return { cmd: first, useShell: false };
+  }
+  const probe = spawnSync("which", ["bun"], { stdio: "pipe" });
+  if (probe.status !== 0) return null;
+  const out = String(probe.stdout ?? "").trim();
+  if (!out) return null;
+  return { cmd: out, useShell: false };
+}
+
+
+function getLang(): Lang {
+  return resolveLang();
+}
+
+async function main(): Promise<void> {
+  const lang = getLang();
+  let bun = resolveBunExecutable();
   if (!bun) {
-    const hint = isWindows()
-      ? "Install Bun and ensure bun.exe is available in PATH."
-      : "Install Bun and ensure it is available in PATH.";
-    console.error("[bkit] Bun runtime not found. " + hint);
+    bun = resolveFromPathProbe();
+  }
+  if (!bun) {
+    console.error(t("launcher.bunMissing", lang));
+    console.error(
+      t("launcher.bunInstallGuide", lang, {
+        url: "https://bun.com/docs/installation",
+      }),
+    );
     process.exitCode = 1;
     return;
   }
@@ -68,4 +97,4 @@ function main(): void {
   }
 }
 
-main();
+void main();
