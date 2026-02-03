@@ -1141,6 +1141,18 @@ const dict: Record<string, Record<Lang, string>> = {
     ja: "プロジェクトが見つかりません。",
     en: "No projects found.",
   },
+  "launcher.bunMissing": {
+    ja: "[bkit] Bun が見つかりません。",
+    en: "[bkit] Bun runtime not found.",
+  },
+  "launcher.bunInstallGuide": {
+    ja: "[bkit] Bun のインストール方法: {url}",
+    en: "[bkit] Install Bun: {url}",
+  },
+  "launcher.bunPrompt": {
+    ja: "今すぐ npm で Bun をインストールしますか？ (y/N): ",
+    en: "Install Bun now via npm? (y/N): ",
+  },
 };
 
 export function t(key: string, lang: Lang = "ja", params: Record<string, string> = {}): string {
