@@ -1,8 +1,9 @@
-import { rm, cp, stat, readdir, lstat, symlink } from "node:fs/promises";
+import { rm, cp, stat } from "node:fs/promises";
 import { dirname, resolve, relative } from "node:path";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { createLogger } from "../core/logger.js";
+import { hasTypeScriptScripts, linkEntries } from "../core/pack-ops.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
 import { resolveProjectsFromArgs } from "../core/projects.js";
 import type { CommandContext, Lang } from "../types.js";
@@ -215,61 +216,6 @@ export async function runBuildWithMode(options: BuildOptions): Promise<void> {
   } else {
     log(t("build.completed", resolvedLang, { mode, outDir }));
   }
-}
-
-async function linkEntries(
-  srcDir: string,
-  destDir: string,
-  rootDir: string,
-  ignoreRules: RegExp[],
-  excludeNames?: Set<string>,
-): Promise<void> {
-  const entries = await readdir(srcDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (excludeNames?.has(entry.name)) continue;
-    const srcPath = resolve(srcDir, entry.name);
-    if (isIgnored(srcPath, rootDir, ignoreRules)) continue;
-    const destPath = resolve(destDir, entry.name);
-    if (await pathExists(destPath)) {
-      await rm(destPath, { recursive: true, force: true });
-    }
-    if (entry.isDirectory()) {
-      const type = process.platform === "win32" ? "junction" : "dir";
-      await symlink(srcPath, destPath, type);
-    } else if (entry.isSymbolicLink()) {
-      const stat = await lstat(srcPath);
-      const type = stat.isDirectory()
-        ? process.platform === "win32"
-          ? "junction"
-          : "dir"
-        : "file";
-      await symlink(srcPath, destPath, type);
-    } else {
-      await symlink(srcPath, destPath, "file");
-    }
-  }
-}
-
-async function hasTypeScriptScripts(packRoot: string): Promise<boolean> {
-  const scriptsRoot = resolve(packRoot, "scripts");
-  if (!(await pathExists(scriptsRoot))) return false;
-  const stack = [scriptsRoot];
-  while (stack.length) {
-    const dir = stack.pop();
-    if (!dir) continue;
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = resolve(dir, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(fullPath);
-        continue;
-      }
-      if (entry.isFile() && entry.name.endsWith(".ts")) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 type ScriptBuildOptions = {

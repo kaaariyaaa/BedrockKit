@@ -6,7 +6,7 @@ import type { CopyTaskParameters } from "@minecraft/core-build-tasks";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
 import { resolveProjectsFromArgs } from "../core/projects.js";
-import type { CommandContext } from "../types.js";
+import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
 import { handleBuild } from "./build.js";
@@ -87,8 +87,9 @@ async function runSyncOne(
     quiet: boolean;
     target?: string;
   },
-  lang: string,
+  lang: Lang,
 ): Promise<void> {
+  const resolvedLang = resolveLang(lang);
   const { info: log } = createLogger({ json: opts.jsonOut, quiet: opts.quiet });
   const configCtx = await loadConfigContext(opts.configPath);
   const { config } = configCtx;
@@ -99,29 +100,29 @@ async function runSyncOne(
   const resourceSrc = resourceEnabled ? resolve(buildDir, config.packs.resource) : null;
 
   if (opts.shouldBuild && !opts.dryRun) {
-    log(t("sync.runBuildNow", resolveLang(lang)));
+    log(t("sync.runBuildNow", resolvedLang));
     const forward: string[] = ["--project", config.project.name];
     if (opts.jsonOut) forward.push("--json");
     if (opts.quiet) forward.push("--quiet");
     if (opts.buildDirOverride) forward.push("--out-dir", opts.buildDirOverride);
-    await handleBuild({ ...ctx, argv: forward, lang: resolveLang(lang) });
+    await handleBuild({ ...ctx, argv: forward, lang: resolvedLang });
   }
 
   if (!(await pathExists(buildDir))) {
-    console.error(t("sync.buildOutputNotFound", resolveLang(lang), { path: buildDir }));
+    console.error(t("sync.buildOutputNotFound", resolvedLang, { path: buildDir }));
     process.exitCode = 1;
     return;
   }
   if (behaviorEnabled && behaviorSrc && !(await pathExists(behaviorSrc))) {
     console.error(
-      t("sync.behaviorOutputNotFound", resolveLang(lang), { path: behaviorSrc }),
+      t("sync.behaviorOutputNotFound", resolvedLang, { path: behaviorSrc }),
     );
     process.exitCode = 1;
     return;
   }
   if (resourceEnabled && resourceSrc && !(await pathExists(resourceSrc))) {
     console.error(
-      t("sync.resourceOutputNotFound", resolveLang(lang), { path: resourceSrc }),
+      t("sync.resourceOutputNotFound", resolvedLang, { path: resourceSrc }),
     );
     process.exitCode = 1;
     return;
@@ -130,7 +131,7 @@ async function runSyncOne(
   const targets = config.sync?.targets ?? {};
   const targetNames = Object.keys(targets);
   if (!targetNames.length) {
-    console.error(t("sync.noTargets", resolveLang(lang)));
+    console.error(t("sync.noTargets", resolvedLang));
     process.exitCode = 1;
     return;
   }
@@ -141,11 +142,11 @@ async function runSyncOne(
   }
   if (!targetName || !(targetName in targets)) {
     const choice = await select({
-      message: t("sync.selectTarget", resolveLang(lang)),
+      message: t("sync.selectTarget", resolvedLang),
       options: targetNames.map((tName) => ({ value: tName, label: tName })),
     });
     if (isCancel(choice)) {
-      console.error(t("sync.cancelled", resolveLang(lang)));
+      console.error(t("sync.cancelled", resolvedLang));
       process.exitCode = 1;
       return;
     }
@@ -160,7 +161,7 @@ async function runSyncOne(
     if (opts.dryRun) {
       if (!opts.jsonOut) {
         log(
-          t("sync.dryRunProduct", resolveLang(lang), {
+          t("sync.dryRunProduct", resolvedLang, {
             product: targetConfig.product,
             project: projectName,
           }),
@@ -179,7 +180,7 @@ async function runSyncOne(
       | ((params: CopyTaskParameters) => () => void)
       | undefined;
     if (!copyTask) {
-      console.error(t("sync.copyTaskMissing", resolveLang(lang)));
+      console.error(t("sync.copyTaskMissing", resolvedLang));
       process.exitCode = 1;
       return;
     }
@@ -191,16 +192,16 @@ async function runSyncOne(
     try {
       await Promise.resolve(copyTask(params)());
       log(
-        t("sync.syncedProduct", resolveLang(lang), {
+        t("sync.syncedProduct", resolvedLang, {
           product: targetConfig.product,
           project: projectName,
         }),
       );
     } catch (err) {
       console.error(
-        t("sync.failed", resolveLang(lang), {
-          error: err instanceof Error ? err.message : String(err),
-        }),
+          t("sync.failed", resolvedLang, {
+            error: err instanceof Error ? err.message : String(err),
+          }),
       );
       process.exitCode = 1;
     }
@@ -212,12 +213,12 @@ async function runSyncOne(
   }
 
   if (behaviorEnabled && !targetConfig?.behavior) {
-    console.error(t("sync.targetMissingBehavior", resolveLang(lang), { target: targetName }));
+    console.error(t("sync.targetMissingBehavior", resolvedLang, { target: targetName }));
     process.exitCode = 1;
     return;
   }
   if (resourceEnabled && !targetConfig?.resource) {
-    console.error(t("sync.targetMissingResource", resolveLang(lang), { target: targetName }));
+    console.error(t("sync.targetMissingResource", resolvedLang, { target: targetName }));
     process.exitCode = 1;
     return;
   }
@@ -228,14 +229,14 @@ async function runSyncOne(
 
   for (const { from, to } of tasks) {
     if (opts.dryRun) {
-      if (!opts.jsonOut) log(t("sync.dryRunSync", resolveLang(lang), { from, to }));
+      if (!opts.jsonOut) log(t("sync.dryRunSync", resolvedLang, { from, to }));
       synced.push({ from, to });
       continue;
     }
     await ensureDir(dirname(to));
     await rm(to, { recursive: true, force: true });
     await cp(from, to, { recursive: true, force: true });
-    if (!opts.jsonOut) log(t("sync.synced", resolveLang(lang), { from, to }));
+    if (!opts.jsonOut) log(t("sync.synced", resolvedLang, { from, to }));
     synced.push({ from, to });
   }
   if (opts.jsonOut) {

@@ -1,18 +1,24 @@
 import chokidar from "chokidar";
-import { resolve, join, dirname } from "node:path";
+import { resolve, dirname } from "node:path";
 import { intro, outro, multiselect, isCancel, select } from "../tui/prompts.js";
 import { createLogger } from "../core/logger.js";
 import { loadConfigContext, resolveOutDir } from "../core/config.js";
+import { discoverProjects } from "../core/projects.js";
 import type { CommandContext, Lang } from "../types.js";
 import { parseArgs } from "../utils/args.js";
 import { ensureDir, pathExists } from "../utils/fs.js";
+import {
+  hasTypeScriptScripts,
+  linkEntries,
+  removeSymlinkEntries,
+} from "../core/pack-ops.js";
 import { runBuildWithMode, runScriptBuildOnly } from "./build.js";
 import { handleSync } from "./sync.js";
-import { readdir, readFile, rm, writeFile, lstat, symlink, cp } from "node:fs/promises";
+import { readFile, rm, writeFile, lstat, cp } from "node:fs/promises";
 import { resolveLang, t } from "../utils/i18n.js";
 import { getSettingsPath, loadSettings, resolveProjectRoot } from "../utils/settings.js";
-import { createRequire } from "node:module";
 import { loadIgnoreRules, isIgnored } from "../utils/ignore.js";
+import { resolveTargetPaths, type SyncTargetConfig } from "../services/sync-targets.js";
 import pc from "picocolors";
 import readline from "node:readline";
 
@@ -24,16 +30,8 @@ type WatchState = {
   startedAt: string;
 };
 type BuildMode = "copy" | "link";
-type SyncTargetConfig = {
-  behavior?: string;
-  resource?: string;
-  product?: string;
-  projectName?: string;
-};
 
 const watchStatePath = resolve(dirname(getSettingsPath()), "watch-link.json");
-const DEVELOPMENT_BEHAVIOR = "development_behavior_packs";
-const DEVELOPMENT_RESOURCE = "development_resource_packs";
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -44,45 +42,6 @@ function formatDuration(ms: number): string {
     return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
   }
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
-}
-
-async function discoverProjects(cwd: string): Promise<ProjectEntry[]> {
-  const settings = await loadSettings();
-  const base = resolveProjectRoot(settings);
-  if (!(await pathExists(base))) return [];
-  const entries = await readdir(base, { withFileTypes: true });
-  const found: ProjectEntry[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const cfg = resolve(base, entry.name, "bkit.config.json");
-    if (await pathExists(cfg)) {
-      found.push({ name: entry.name, configPath: cfg });
-    }
-  }
-  return found;
-}
-
-function resolveTargetPaths(
-  target: SyncTargetConfig,
-  projectName: string,
-): { behavior?: string; resource?: string } {
-  if (target.behavior || target.resource) {
-    return { behavior: target.behavior, resource: target.resource };
-  }
-  if (!target.product) return {};
-  const require = createRequire(import.meta.url);
-  const coreBuild = require("@minecraft/core-build-tasks");
-  const getGameDeploymentRootPaths = (coreBuild as any).getGameDeploymentRootPaths as
-    | (() => Record<string, string | undefined>)
-    | undefined;
-  if (!getGameDeploymentRootPaths) return {};
-  const rootPaths = getGameDeploymentRootPaths();
-  const root = rootPaths[target.product];
-  if (!root) return {};
-  return {
-    behavior: join(root, DEVELOPMENT_BEHAVIOR, projectName),
-    resource: join(root, DEVELOPMENT_RESOURCE, projectName),
-  };
 }
 
 async function pickTargetName(
@@ -108,59 +67,6 @@ async function pickTargetName(
   return String(choice);
 }
 
-async function linkEntries(
-  srcDir: string,
-  destDir: string,
-  rootDir: string,
-  ignoreRules: RegExp[],
-  excludeNames?: Set<string>,
-): Promise<void> {
-  const entries = await readdir(srcDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (excludeNames?.has(entry.name)) continue;
-    const srcPath = resolve(srcDir, entry.name);
-    if (isIgnored(srcPath, rootDir, ignoreRules)) continue;
-    const destPath = resolve(destDir, entry.name);
-    if (await pathExists(destPath)) {
-      await rm(destPath, { recursive: true, force: true });
-    }
-    if (entry.isDirectory()) {
-      const type = process.platform === "win32" ? "junction" : "dir";
-      await symlink(srcPath, destPath, type);
-    } else if (entry.isSymbolicLink()) {
-      const stat = await lstat(srcPath);
-      const type = stat.isDirectory()
-        ? process.platform === "win32"
-          ? "junction"
-          : "dir"
-        : "file";
-      await symlink(srcPath, destPath, type);
-    } else {
-      await symlink(srcPath, destPath, "file");
-    }
-  }
-}
-
-async function removeSymlinkEntries(rootDir: string): Promise<void> {
-  const stack = [rootDir];
-  while (stack.length) {
-    const current = stack.pop();
-    if (!current) continue;
-    const entries = await readdir(current, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = resolve(current, entry.name);
-      const stat = await lstat(fullPath);
-      if (stat.isSymbolicLink()) {
-        await rm(fullPath, { recursive: true, force: true });
-        continue;
-      }
-      if (stat.isDirectory()) {
-        stack.push(fullPath);
-      }
-    }
-  }
-}
-
 async function saveWatchState(state: WatchState): Promise<void> {
   await writeFile(watchStatePath, JSON.stringify(state, null, 2), "utf8");
 }
@@ -168,28 +74,6 @@ async function saveWatchState(state: WatchState): Promise<void> {
 async function removeWatchState(): Promise<void> {
   if (!(await pathExists(watchStatePath))) return;
   await rm(watchStatePath, { force: true });
-}
-
-async function hasTypeScriptScripts(packRoot: string): Promise<boolean> {
-  const scriptsRoot = resolve(packRoot, "scripts");
-  if (!(await pathExists(scriptsRoot))) return false;
-  const stack = [scriptsRoot];
-  while (stack.length) {
-    const dir = stack.pop();
-    if (!dir) continue;
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = resolve(dir, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(fullPath);
-        continue;
-      }
-      if (entry.isFile() && entry.name.endsWith(".ts")) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 async function copyBehaviorPackFinal(
@@ -467,7 +351,10 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   await recoverFromWatchState(log, outDirOverride, lang);
 
   const settings = await loadSettings();
-  const projects = await discoverProjects(process.cwd());
+  const projects = (await discoverProjects()).map((p) => ({
+    name: p.name,
+    configPath: p.configPath,
+  }));
   if (!projects.length) {
     console.error(
       t("watch.noProjectsFound", lang, { path: resolveProjectRoot(settings) }),
